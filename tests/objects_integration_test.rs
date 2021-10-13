@@ -241,7 +241,7 @@ fn assert_unexpected_response(err: gcs_sync::storage::Error, content: &str) {
 fn assert_not_found_response(err: gcs_sync::storage::Error) {
     match err {
         gcs_sync::storage::Error::GcsResourceNotFound => (),
-        e => panic!("expected UnexpectedApiResponse error got {:?}", e),
+        e => panic!("expected GcsResourceNotFound error got {:?}", e),
     }
 }
 
