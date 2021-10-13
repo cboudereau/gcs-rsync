@@ -1,3 +1,5 @@
+use std::{ops::Not, path::PathBuf};
+
 use futures::{StreamExt, TryStreamExt};
 use gcs_sync::{
     oauth2::token::AuthorizedUserCredentials,
@@ -8,8 +10,9 @@ use gcs_sync::{
 
 struct TestConfig {
     bucket: String,
-    prefix: String,
-    test_prefix: String,
+    prefix: PathBuf,
+    test_prefix: PathBuf,
+    list_prefix: String,
 }
 
 impl TestConfig {
@@ -18,25 +21,71 @@ impl TestConfig {
             .map_err(|x| format!("missing {} env var: {:?}", key, x))
             .unwrap()
     }
+
     fn from_env(test_prefix: &str) -> Self {
+        fn to_path_buf(path: &str) -> PathBuf {
+            let path = path.strip_prefix('/').unwrap_or(path);
+            let path = if path.ends_with('/') {
+                path.to_owned()
+            } else {
+                format!("{}/", path)
+            };
+
+            PathBuf::from(path)
+        }
+
+        let prefix = {
+            let mut prefix = to_path_buf(Self::of_env_var("PREFIX").as_str());
+            let uuid = uuid::Uuid::new_v4().to_hyphenated().to_string();
+            prefix.push(uuid);
+            prefix
+        };
+
+        let test_prefix = to_path_buf(test_prefix);
+
+        let mut list_prefix = prefix.clone();
+        list_prefix.push(test_prefix.as_path());
+
         Self {
             bucket: Self::of_env_var("BUCKET"),
-            prefix: Self::of_env_var("PREFIX"),
-            test_prefix: test_prefix.to_owned(),
+            prefix,
+            test_prefix,
+            list_prefix: list_prefix.to_string_lossy().to_string(),
         }
     }
 
     fn object(&self, name: &str) -> Object {
-        let name = format!("{}/{}/{}", &self.prefix, &self.test_prefix, name);
+        let mut path = self.prefix.clone();
+        path.push(&self.test_prefix);
+        path.push(name);
         Object {
             bucket: self.bucket.to_owned(),
-            name,
+            name: path.to_string_lossy().to_string(),
         }
     }
 
     fn list_prefix(&self) -> String {
-        format!("{}/{}/", &self.prefix, &self.test_prefix)
+        self.list_prefix.to_owned()
     }
+}
+
+#[test]
+fn test_test_config() {
+    let t = TestConfig::from_env("test/prefix");
+
+    assert!(
+        t.list_prefix().ends_with("/test/prefix/"),
+        "list prefix should end with /test/prefix/"
+    );
+
+    assert!(
+        t.object("object_name")
+            .name
+            .ends_with("/test/prefix/object_name"),
+        "object name should end with /test/prefix/object_name"
+    );
+
+    assert!(t.bucket.is_empty().not(), "bucket should not be empty");
 }
 
 async fn get_client() -> ObjectClient<AuthorizedUserCredentials> {
@@ -138,14 +187,14 @@ async fn test_get_object_ok() {
 
     let partial_object = object_client.get(&object, "name,selfLink").await.unwrap();
 
-    assert_eq!(
-        "integration-test/test_get_object/object.txt",
-        partial_object.name.unwrap()
-    );
+    assert!(partial_object
+        .name
+        .unwrap()
+        .ends_with("test_get_object/object.txt"));
     assert!(partial_object
         .self_link
         .unwrap()
-        .contains("o/integration-test%2Ftest_get_object%2Fobject.txt"));
+        .ends_with("test_get_object%2Fobject.txt"));
     assert_eq!(None, partial_object.crc32c);
     assert_delete_ok(&object_client, &object).await;
 }

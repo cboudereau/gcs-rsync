@@ -20,3 +20,4 @@ crc32c           = "0.6"
 
 [dev-dependencies]
 tokio        = { version = "1.12", default-features = false, features = ["full"] }
+uuid         = { version = "0.8",  default-features = false, features = ["v4"] }
