@@ -15,6 +15,9 @@ pub struct ReaderWriter<T> {
     inner: ReaderWriterInternal<T>,
 }
 
+pub type DefaultSource = ReaderWriter<crate::oauth2::token::AuthorizedUserCredentials>;
+pub type GcsSource<T> = ReaderWriter<T>;
+
 impl<T> ReaderWriter<T>
 where
     T: crate::oauth2::token::TokenGenerator,
@@ -103,6 +106,7 @@ where
     }
 }
 
+pub type FsRSync = RSync<crate::oauth2::token::AuthorizedUserCredentials>;
 pub struct RSync<T> {
     source: ReaderWriterInternal<T>,
     dest: ReaderWriterInternal<T>,
@@ -119,23 +123,27 @@ where
         }
     }
 
-    async fn write_entry(&self, path: &RelativePath) -> RSyncResult<RSyncStatus> {
+    async fn write_entry(&self, path: &RelativePath) -> RSyncResult<()> {
         let source = self.source.read(path).await;
         self.dest.write(path, source).await?;
-        Ok(RSyncStatus::Updated(path.to_owned()))
+        Ok(())
     }
 
     async fn sync_entry(&self, path: &RelativePath) -> RSyncResult<RSyncStatus> {
         let crc = self.dest.get_crc32c(path).await?;
 
         Ok(match crc {
-            None => self.write_entry(path).await?,
+            None => {
+                self.write_entry(path).await?;
+                RSyncStatus::Created(path.to_owned())
+            }
             Some(crc32c_dest) => {
                 let crc32c_source = self.source.get_crc32c(path).await?;
                 if Some(crc32c_dest) == crc32c_source {
                     RSyncStatus::AlreadySynced(path.to_owned())
                 } else {
-                    self.write_entry(path).await?
+                    self.write_entry(path).await?;
+                    RSyncStatus::Updated(path.to_owned())
                 }
             }
         })
@@ -188,7 +196,7 @@ where
     }
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RelativePath {
     path: String,
 }
@@ -201,7 +209,7 @@ impl std::fmt::Debug for RelativePath {
 
 impl RelativePath {
     /// Invariant: a name should not start with a slash
-    fn new(path: &str) -> Self {
+    pub fn new(path: &str) -> Self {
         let path = path.strip_prefix('/').unwrap_or(path).to_owned();
         Self { path }
     }
@@ -236,13 +244,14 @@ impl std::fmt::Display for RSyncError {
 
 impl std::error::Error for RSyncError {}
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum RSyncStatus {
+    Created(RelativePath),
     Updated(RelativePath),
     AlreadySynced(RelativePath),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum RMirrorStatus {
     Synced(RSyncStatus),
     Deleted(RelativePath),

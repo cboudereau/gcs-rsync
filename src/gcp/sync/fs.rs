@@ -141,6 +141,7 @@ impl FsClient {
         }
 
         buf_writer.flush().await.map_err(RSyncError::FsIoError)?;
+
         Ok(())
     }
 }

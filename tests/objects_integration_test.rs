@@ -11,8 +11,8 @@ use gcs_sync::{
 struct TestConfig {
     bucket: String,
     prefix: PathBuf,
-    test_prefix: PathBuf,
     list_prefix: String,
+    client: ObjectClient<AuthorizedUserCredentials>,
 }
 
 impl TestConfig {
@@ -22,7 +22,12 @@ impl TestConfig {
             .unwrap()
     }
 
-    fn from_env(test_prefix: &str) -> Self {
+    async fn get_client() -> ObjectClient<AuthorizedUserCredentials> {
+        let auc = credentials::authorizeduser::default().await.unwrap();
+        ObjectClient::new(auc).await.unwrap()
+    }
+
+    async fn from_env() -> Self {
         fn to_path_buf(path: &str) -> PathBuf {
             let path = path.strip_prefix('/').unwrap_or(path);
             let path = if path.ends_with('/') {
@@ -41,22 +46,16 @@ impl TestConfig {
             prefix
         };
 
-        let test_prefix = to_path_buf(test_prefix);
-
-        let mut list_prefix = prefix.clone();
-        list_prefix.push(test_prefix.as_path());
-
         Self {
             bucket: Self::of_env_var("BUCKET"),
-            prefix,
-            test_prefix,
-            list_prefix: list_prefix.to_string_lossy().to_string(),
+            prefix: prefix.to_owned(),
+            list_prefix: prefix.to_string_lossy().to_string(),
+            client: Self::get_client().await,
         }
     }
 
     fn object(&self, name: &str) -> Object {
         let mut path = self.prefix.clone();
-        path.push(&self.test_prefix);
         path.push(name);
         Object {
             bucket: self.bucket.to_owned(),
@@ -69,28 +68,21 @@ impl TestConfig {
     }
 }
 
-#[test]
-fn test_test_config() {
-    let t = TestConfig::from_env("test/prefix");
+#[tokio::test]
+async fn test_test_config() {
+    let t = TestConfig::from_env().await;
 
     assert!(
-        t.list_prefix().ends_with("/test/prefix/"),
-        "list prefix should end with /test/prefix/"
+        t.list_prefix().is_empty().not(),
+        "list prefix should not be empty"
     );
 
     assert!(
-        t.object("object_name")
-            .name
-            .ends_with("/test/prefix/object_name"),
-        "object name should end with /test/prefix/object_name"
+        t.object("object_name").name.ends_with("/object_name"),
+        "object name should end with /object_name"
     );
 
     assert!(t.bucket.is_empty().not(), "bucket should not be empty");
-}
-
-async fn get_client() -> ObjectClient<AuthorizedUserCredentials> {
-    let auc = credentials::authorizeduser::default().await.unwrap();
-    ObjectClient::new(auc).await.unwrap()
 }
 
 async fn assert_delete_err(
@@ -164,8 +156,8 @@ async fn assert_download_bytes(
 
 #[tokio::test]
 async fn test_delete_upload_download_delete() {
-    let object_client = get_client().await;
-    let test_config = TestConfig::from_env("test_delete_upload_download_delete");
+    let test_config = TestConfig::from_env().await;
+    let object_client = &test_config.client;
     let object = test_config.object("object.txt");
 
     let content = "hello";
@@ -177,8 +169,8 @@ async fn test_delete_upload_download_delete() {
 
 #[tokio::test]
 async fn test_get_object_ok() {
-    let object_client = get_client().await;
-    let test_config = TestConfig::from_env("test_get_object");
+    let test_config = TestConfig::from_env().await;
+    let object_client = &test_config.client;
     let object = test_config.object("object.txt");
 
     let content = "hello";
@@ -187,22 +179,16 @@ async fn test_get_object_ok() {
 
     let partial_object = object_client.get(&object, "name,selfLink").await.unwrap();
 
-    assert!(partial_object
-        .name
-        .unwrap()
-        .ends_with("test_get_object/object.txt"));
-    assert!(partial_object
-        .self_link
-        .unwrap()
-        .ends_with("test_get_object%2Fobject.txt"));
+    assert!(partial_object.name.unwrap().ends_with("object.txt"));
+    assert!(partial_object.self_link.unwrap().ends_with("%2Fobject.txt"));
     assert_eq!(None, partial_object.crc32c);
     assert_delete_ok(&object_client, &object).await;
 }
 
 #[tokio::test]
 async fn test_get_object_not_found() {
-    let object_client = get_client().await;
-    let test_config = TestConfig::from_env("test_get_object_not_found");
+    let test_config = TestConfig::from_env().await;
+    let object_client = &test_config.client;
     let object = test_config.object("object.txt");
 
     let err = object_client
@@ -215,7 +201,8 @@ async fn test_get_object_not_found() {
 
 #[tokio::test]
 async fn test_upload_with_detailed_error() {
-    let object_client = get_client().await;
+    let test_config = TestConfig::from_env().await;
+    let object_client = &test_config.client;
     let object = Object::new("the_bad_bucket", "name");
 
     let err = upload_bytes(&object_client, &object, "").await.unwrap_err();
@@ -225,8 +212,8 @@ async fn test_upload_with_detailed_error() {
 
 #[tokio::test]
 async fn test_api_list_objects() {
-    let object_client = get_client().await;
-    let test_config = TestConfig::from_env("test_api_list_objects");
+    let test_config = TestConfig::from_env().await;
+    let object_client = &test_config.client;
 
     let count = 11;
 
@@ -264,8 +251,8 @@ async fn test_api_list_objects() {
 
 #[tokio::test]
 async fn test_crc32c_object() {
-    let object_client = get_client().await;
-    let test_config = TestConfig::from_env("test_crc32c_object");
+    let test_config = TestConfig::from_env().await;
+    let object_client = &test_config.client;
 
     let test_object = test_config.object("test_crc32c");
     assert_upload_bytes(&object_client, &test_object, "hello world!").await;
