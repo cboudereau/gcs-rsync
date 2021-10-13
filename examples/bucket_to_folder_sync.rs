@@ -11,8 +11,8 @@ async fn main() -> RSyncResult<()> {
     let token_generator = authorizeduser::default().await.unwrap();
 
     let home_dir = env!("HOME");
-    let test_prefix = env!("PREFIX_EXAMPLE");
-    let bucket = env!("BUCKET_EXAMPLE");
+    let test_prefix = env!("EXAMPLE_PREFIX");
+    let bucket = env!("EXAMPLE_BUCKET");
 
     let source = ReaderWriter::gcs(token_generator, bucket, test_prefix)
         .await

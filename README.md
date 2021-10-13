@@ -185,7 +185,7 @@ cargo test --lib
 ## Integration tests + Unit tests
 
 ```bash
-SERVICE_ACCOUNT=<PathToAServiceAccount> BUCKET=<BUCKET> PREFIX=<PREFIX> cargo test --no-fail-fast
+TEST_SERVICE_ACCOUNT=<PathToAServiceAccount> TEST_BUCKET=<BUCKET> TEST_PREFIX=<PREFIX> cargo test --no-fail-fast
 ```
 
 ## Example

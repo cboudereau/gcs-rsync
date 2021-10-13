@@ -15,7 +15,7 @@ async fn test_token_dev() {
 #[tokio::test]
 async fn test_token_service_account() {
     let client = Client::default();
-    let path = std::env::var("SERVICE_ACCOUNT").unwrap();
+    let path = env!("TEST_SERVICE_ACCOUNT");
     let sac = ServiceAccountCredentials::from_file(path).await.unwrap();
     let t = sac
         .with_scope("https://www.googleapis.com/auth/devstorage.full_control")
@@ -28,7 +28,7 @@ async fn test_token_service_account() {
 #[tokio::test]
 async fn test_token_service_account_with_detailed_error() {
     let client = Client::default();
-    let path = std::env::var("SERVICE_ACCOUNT").unwrap();
+    let path = env!("TEST_SERVICE_ACCOUNT");
     let sac = ServiceAccountCredentials::from_file(path).await.unwrap();
     match sac.with_scope("").get(&client).await.unwrap_err() {
         gcs_sync::oauth2::Error::UnexpectedApiResponse(actual) => {
