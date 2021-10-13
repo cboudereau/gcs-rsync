@@ -13,7 +13,7 @@ gcs-sync is faster than `gsutil rsync` when files change a lot while performance
 - [x] Sync local folder (one way sync without delete remote files with crc32c support)
 - [x] Mirror local folder (sync + delete remotes files)
 - [x] Benchmarks
-- [ ] Sync/Mirror integration tests
+- [x] Sync/Mirror integration tests
 - [ ] CI/CD
 - [ ] Doc crate
 - [ ] Publish crate
