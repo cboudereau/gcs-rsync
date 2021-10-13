@@ -5,7 +5,6 @@ use gcs_sync::{
     storage::{credentials, Object},
 };
 
-#[allow(dead_code)] //remove this when this issue will be fixed: https://github.com/rust-lang/rust/issues/46379
 pub struct GcsTestConfig {
     bucket: String,
     prefix: PathBuf,
