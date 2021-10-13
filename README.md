@@ -13,8 +13,9 @@ gcs-sync is faster than `gsutil rsync` when files change a lot while performance
 - [x] Sync local folder (one way sync without delete remote files with crc32c support)
 - [x] Mirror local folder (sync + delete remotes files)
 - [x] Benchmarks
-- [ ] Sync/Mirror integration tests
+- [x] Sync/Mirror integration tests
 - [ ] CI/CD
+- [ ] Doc crate
 - [ ] Publish crate
 
 ### Benchmark
@@ -184,7 +185,7 @@ cargo test --lib
 ## Integration tests + Unit tests
 
 ```bash
-SERVICE_ACCOUNT=<PathToAServiceAccount> BUCKET=<BUCKET> PREFIX=<PREFIX> cargo test --no-fail-fast
+TEST_SERVICE_ACCOUNT=<PathToAServiceAccount> TEST_BUCKET=<BUCKET> TEST_PREFIX=<PREFIX> cargo test --no-fail-fast
 ```
 
 ## Example
@@ -238,4 +239,13 @@ sudo -- cargo flamegraph --example list_objects "<YourBucket>" "<YourPrefixHavin
 
 ```bash
 cargo build --release --examples && /usr/bin/time -lp -- ./target/release/examples/list_objects "<YourBucket>" "<YourPrefixHavingMoreThan60K>"
+```
+
+### Native bin build (static shared lib)
+
+```bash
+docker rust rust:alpine3.14
+apk add --no-cache musl-dev pkgconfig openssl-dev
+
+LDFLAGS="-static -L/usr/local/musl/lib" LD_LIBRARY_PATH=/usr/local/musl/lib:$LD_LIBRARY_PATH CFLAGS="-I/usr/local/musl/include" PKG_CONFIG_PATH=/usr/local/musl/lib/pkgconfig cargo build --release --target=x86_64-unknown-linux-musl --example bucket_to_folder_sync
 ```

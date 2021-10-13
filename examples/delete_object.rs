@@ -1,4 +1,4 @@
-use gcs_sync::storage::{credentials, Object, ObjectClient, StorageResult};
+use gcs_rsync::storage::{credentials, Object, ObjectClient, StorageResult};
 
 #[tokio::main]
 async fn main() -> StorageResult<()> {

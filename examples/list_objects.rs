@@ -1,5 +1,5 @@
 use futures::TryStreamExt;
-use gcs_sync::storage::{credentials, ObjectClient, ObjectsListRequest, StorageResult};
+use gcs_rsync::storage::{credentials, ObjectClient, ObjectsListRequest, StorageResult};
 
 #[tokio::main]
 async fn main() -> StorageResult<()> {

@@ -1,5 +1,5 @@
 use futures::{StreamExt, TryStreamExt};
-use gcs_sync::{
+use gcs_rsync::{
     storage::credentials::authorizeduser,
     sync::{RSync, RSyncResult, ReaderWriter},
 };
@@ -8,12 +8,16 @@ use gcs_sync::{
 async fn main() -> RSyncResult<()> {
     let token_generator = authorizeduser::default().await.unwrap();
 
-    let source = ReaderWriter::gcs(token_generator, "test", "A")
+    let test_prefix = env!("EXAMPLE_PREFIX");
+    let bucket = env!("EXAMPLE_BUCKET");
+
+    let source = ReaderWriter::gcs(token_generator, bucket, test_prefix)
         .await
         .unwrap();
     let token_generator = authorizeduser::default().await.unwrap();
 
-    let dest = ReaderWriter::gcs(token_generator, "test", "B")
+    let dest_prefix = format!("{}_dest", test_prefix);
+    let dest = ReaderWriter::gcs(token_generator, bucket, &dest_prefix)
         .await
         .unwrap();
 
