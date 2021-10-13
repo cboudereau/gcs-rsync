@@ -1,4 +1,4 @@
-use std::{ops::Not, path::PathBuf};
+use std::ops::Not;
 
 use futures::{StreamExt, TryStreamExt};
 use gcs_sync::{
@@ -8,69 +8,12 @@ use gcs_sync::{
     },
 };
 
-struct TestConfig {
-    bucket: String,
-    prefix: PathBuf,
-    list_prefix: String,
-    client: ObjectClient<AuthorizedUserCredentials>,
-}
-
-impl TestConfig {
-    fn of_env_var(key: &str) -> String {
-        std::env::var(key)
-            .map_err(|x| format!("missing {} env var: {:?}", key, x))
-            .unwrap()
-    }
-
-    async fn get_client() -> ObjectClient<AuthorizedUserCredentials> {
-        let auc = credentials::authorizeduser::default().await.unwrap();
-        ObjectClient::new(auc).await.unwrap()
-    }
-
-    async fn from_env() -> Self {
-        fn to_path_buf(path: &str) -> PathBuf {
-            let path = path.strip_prefix('/').unwrap_or(path);
-            let path = if path.ends_with('/') {
-                path.to_owned()
-            } else {
-                format!("{}/", path)
-            };
-
-            PathBuf::from(path)
-        }
-
-        let prefix = {
-            let mut prefix = to_path_buf(Self::of_env_var("PREFIX").as_str());
-            let uuid = uuid::Uuid::new_v4().to_hyphenated().to_string();
-            prefix.push(uuid);
-            prefix
-        };
-
-        Self {
-            bucket: Self::of_env_var("BUCKET"),
-            prefix: prefix.to_owned(),
-            list_prefix: prefix.to_string_lossy().to_string(),
-            client: Self::get_client().await,
-        }
-    }
-
-    fn object(&self, name: &str) -> Object {
-        let mut path = self.prefix.clone();
-        path.push(name);
-        Object {
-            bucket: self.bucket.to_owned(),
-            name: path.to_string_lossy().to_string(),
-        }
-    }
-
-    fn list_prefix(&self) -> String {
-        self.list_prefix.to_owned()
-    }
-}
+mod config;
+use config::gcs::GcsTestConfig;
 
 #[tokio::test]
 async fn test_test_config() {
-    let t = TestConfig::from_env().await;
+    let t = GcsTestConfig::from_env().await;
 
     assert!(
         t.list_prefix().is_empty().not(),
@@ -156,40 +99,40 @@ async fn assert_download_bytes(
 
 #[tokio::test]
 async fn test_delete_upload_download_delete() {
-    let test_config = TestConfig::from_env().await;
-    let object_client = &test_config.client;
+    let test_config = GcsTestConfig::from_env().await;
     let object = test_config.object("object.txt");
+    let object_client = ObjectClient::new(test_config.token).await.unwrap();
 
     let content = "hello";
-    assert_delete_err(object_client, &object).await;
-    assert_upload_bytes(object_client, &object, content).await;
-    assert_download_bytes(object_client, &object, content).await;
-    assert_delete_ok(object_client, &object).await;
+    assert_delete_err(&object_client, &object).await;
+    assert_upload_bytes(&object_client, &object, content).await;
+    assert_download_bytes(&object_client, &object, content).await;
+    assert_delete_ok(&object_client, &object).await;
 }
 
 #[tokio::test]
 async fn test_get_object_ok() {
-    let test_config = TestConfig::from_env().await;
-    let object_client = &test_config.client;
+    let test_config = GcsTestConfig::from_env().await;
     let object = test_config.object("object.txt");
+    let object_client = ObjectClient::new(test_config.token).await.unwrap();
 
     let content = "hello";
-    assert_delete_err(object_client, &object).await;
-    assert_upload_bytes(object_client, &object, content).await;
+    assert_delete_err(&object_client, &object).await;
+    assert_upload_bytes(&object_client, &object, content).await;
 
     let partial_object = object_client.get(&object, "name,selfLink").await.unwrap();
 
     assert!(partial_object.name.unwrap().ends_with("object.txt"));
     assert!(partial_object.self_link.unwrap().ends_with("%2Fobject.txt"));
     assert_eq!(None, partial_object.crc32c);
-    assert_delete_ok(object_client, &object).await;
+    assert_delete_ok(&object_client, &object).await;
 }
 
 #[tokio::test]
 async fn test_get_object_not_found() {
-    let test_config = TestConfig::from_env().await;
-    let object_client = &test_config.client;
+    let test_config = GcsTestConfig::from_env().await;
     let object = test_config.object("object.txt");
+    let object_client = ObjectClient::new(test_config.token).await.unwrap();
 
     let err = object_client
         .get(&object, "name,selfLink")
@@ -201,34 +144,34 @@ async fn test_get_object_not_found() {
 
 #[tokio::test]
 async fn test_upload_with_detailed_error() {
-    let test_config = TestConfig::from_env().await;
-    let object_client = &test_config.client;
+    let test_config = GcsTestConfig::from_env().await;
+    let object_client = ObjectClient::new(test_config.token).await.unwrap();
     let object = Object::new("the_bad_bucket", "name");
 
-    let err = upload_bytes(object_client, &object, "").await.unwrap_err();
+    let err = upload_bytes(&object_client, &object, "").await.unwrap_err();
 
     assert_unexpected_response(err, "forbidden");
 }
 
 #[tokio::test]
 async fn test_api_list_objects() {
-    let test_config = TestConfig::from_env().await;
-    let object_client = &test_config.client;
+    let test_config = GcsTestConfig::from_env().await;
 
     let count = 11;
-
+    let prefix = test_config.list_prefix();
     let test_objects = (0..count + 2)
         .map(|i| test_config.object(format!("object_{}", i).as_str()))
         .collect::<Vec<_>>();
 
+    let object_client = ObjectClient::new(test_config.token).await.unwrap();
     futures::stream::iter(test_objects.iter())
-        .for_each_concurrent(12, |object| {
-            assert_upload_bytes(object_client, object, "hello")
+        .for_each_concurrent(config::default::CONCURRENCY_LEVEL, |object| {
+            assert_upload_bytes(&object_client, object, "hello")
         })
         .await;
 
     let objects_list_request = ObjectsListRequest {
-        prefix: Some(test_config.list_prefix()),
+        prefix: Some(prefix),
         fields: Some("items(selfLink,name),nextPageToken".to_owned()),
         max_results: Some(2),
         ..Default::default()
@@ -245,20 +188,22 @@ async fn test_api_list_objects() {
     assert_eq!(count, result.len());
 
     futures::stream::iter(test_objects.iter())
-        .for_each_concurrent(12, |object| assert_delete_ok(object_client, object))
+        .for_each_concurrent(config::default::CONCURRENCY_LEVEL, |object| {
+            assert_delete_ok(&object_client, object)
+        })
         .await;
 }
 
 #[tokio::test]
 async fn test_crc32c_object() {
-    let test_config = TestConfig::from_env().await;
-    let object_client = &test_config.client;
-
-    let test_object = test_config.object("test_crc32c");
-    assert_upload_bytes(object_client, &test_object, "hello world!").await;
+    let test_config = GcsTestConfig::from_env().await;
+    let prefix = test_config.list_prefix();
+    let test_object = &test_config.object("test_crc32c");
+    let object_client = ObjectClient::new(test_config.token).await.unwrap();
+    assert_upload_bytes(&object_client, test_object, "hello world!").await;
 
     let objects_list_request = ObjectsListRequest {
-        prefix: Some(test_config.list_prefix()),
+        prefix: Some(prefix),
         fields: Some("items(name,crc32c),nextPageToken".to_owned()),
         max_results: Some(2),
         ..Default::default()
@@ -274,7 +219,7 @@ async fn test_crc32c_object() {
     assert_eq!(1, result.len());
     let crc32c = result.pop().unwrap().crc32c.unwrap_or_default().to_u32();
     assert_eq!(1238062967, crc32c);
-    assert_delete_ok(object_client, &test_object).await;
+    assert_delete_ok(&object_client, test_object).await;
 }
 
 fn assert_unexpected_response(err: gcs_sync::storage::Error, content: &str) {

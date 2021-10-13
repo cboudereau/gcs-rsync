@@ -6,13 +6,14 @@ use gcs_sync::sync::{
 };
 use tokio::io::AsyncWriteExt;
 
-struct TestConfig {
+struct FsTestConfig {
     base_path: PathBuf,
 }
 
-const CONCURRENCY_LEVEL: usize = 12;
+mod config;
+use config::gcs::GcsTestConfig;
 
-impl TestConfig {
+impl FsTestConfig {
     fn new() -> Self {
         let base_path = {
             let uuid = uuid::Uuid::new_v4().to_hyphenated().to_string();
@@ -30,7 +31,7 @@ impl TestConfig {
     }
 }
 
-impl Drop for TestConfig {
+impl Drop for FsTestConfig {
     fn drop(&mut self) {
         std::fs::remove_dir_all(self.base_path.as_path()).unwrap();
     }
@@ -55,7 +56,7 @@ async fn delete_file(path: &Path) {
 
 async fn setup_files(file_names: &[PathBuf], content: &str) {
     futures::stream::iter(file_names)
-        .for_each_concurrent(CONCURRENCY_LEVEL, |x| {
+        .for_each_concurrent(config::default::CONCURRENCY_LEVEL, |x| {
             assert_create_file(x.as_path(), content)
         })
         .await;
@@ -63,7 +64,9 @@ async fn setup_files(file_names: &[PathBuf], content: &str) {
 
 async fn delete_files(file_names: &[PathBuf]) {
     futures::stream::iter(file_names)
-        .for_each_concurrent(CONCURRENCY_LEVEL, |x| delete_file(x.as_path()))
+        .for_each_concurrent(config::default::CONCURRENCY_LEVEL, |x| {
+            delete_file(x.as_path())
+        })
         .await;
 }
 
@@ -71,7 +74,7 @@ async fn sync(fs_client: &DefaultRSync) -> Vec<RSyncStatus> {
     let mut actual = fs_client
         .sync()
         .await
-        .try_buffer_unordered(CONCURRENCY_LEVEL)
+        .try_buffer_unordered(config::default::CONCURRENCY_LEVEL)
         .try_collect::<Vec<_>>()
         .await
         .unwrap();
@@ -83,7 +86,7 @@ async fn mirror(fs_client: &DefaultRSync) -> Vec<RMirrorStatus> {
     let mut actual = fs_client
         .mirror()
         .await
-        .try_buffer_unordered(CONCURRENCY_LEVEL)
+        .try_buffer_unordered(config::default::CONCURRENCY_LEVEL)
         .try_collect::<Vec<_>>()
         .await
         .unwrap();
@@ -116,8 +119,8 @@ fn synced(x: RSyncStatus) -> RMirrorStatus {
 }
 
 #[tokio::test]
-async fn test_fs_to_fs_sync() {
-    let src_t = TestConfig::new();
+async fn test_fs_to_gcs_sync_and_mirror() {
+    let src_t = FsTestConfig::new();
 
     let file_names = vec![
         "/hello/world/test.txt",
@@ -130,10 +133,16 @@ async fn test_fs_to_fs_sync() {
 
     setup_files(&file_names[..], "Hello World").await;
 
-    let dst_t = TestConfig::new();
+    let dst_t = GcsTestConfig::from_env().await;
 
     let source = DefaultSource::fs(src_t.base_path.as_path());
-    let dest = DefaultSource::fs(dst_t.base_path.as_path());
+    let dest = DefaultSource::gcs(
+        dst_t.token,
+        dst_t.bucket.as_str(),
+        dst_t.prefix.to_str().unwrap(),
+    )
+    .await
+    .unwrap();
     let fs_client = RSync::new(source, dest);
 
     let actual = sync(&fs_client).await;
@@ -158,8 +167,9 @@ async fn test_fs_to_fs_sync() {
         actual
     );
 
+    let new_file = src_t.file_path("new.json");
     write_to_file(src_t.file_path("test.json").as_path(), "top new content").await;
-    write_to_file(src_t.file_path("new.json").as_path(), "top new content").await;
+    write_to_file(new_file.as_path(), "top new content").await;
     let actual = sync(&fs_client).await;
 
     assert_eq!(
@@ -186,4 +196,8 @@ async fn test_fs_to_fs_sync() {
         ],
         actual
     );
+    delete_file(new_file.as_path()).await;
+
+    let actual = mirror(&fs_client).await;
+    assert_eq!(vec![deleted("new.json"),], actual);
 }
