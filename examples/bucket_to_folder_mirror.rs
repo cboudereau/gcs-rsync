@@ -1,7 +1,7 @@
 use std::{path::PathBuf, str::FromStr};
 
 use futures::{StreamExt, TryStreamExt};
-use gcs_sync::{
+use gcs_rsync::{
     storage::credentials::authorizeduser,
     sync::{RMirrorStatus, RSync, RSyncResult, ReaderWriter},
 };

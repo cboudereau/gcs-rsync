@@ -1,7 +1,7 @@
 use std::ops::Not;
 
 use futures::{StreamExt, TryStreamExt};
-use gcs_sync::{
+use gcs_rsync::{
     oauth2::token::AuthorizedUserCredentials,
     storage::{
         credentials, Object, ObjectClient, ObjectsListRequest, PartialObject, StorageResult,
@@ -224,9 +224,9 @@ async fn test_crc32c_object() {
     assert_delete_ok(&object_client, test_object).await;
 }
 
-fn assert_unexpected_response(err: gcs_sync::storage::Error, content: &str) {
+fn assert_unexpected_response(err: gcs_rsync::storage::Error, content: &str) {
     match err {
-        gcs_sync::storage::Error::GcsUnexpectedResponse(actual) => {
+        gcs_rsync::storage::Error::GcsUnexpectedResponse(actual) => {
             assert!(
                 actual.to_string().contains(content),
                 "{:?} not found in json {}",
@@ -238,9 +238,9 @@ fn assert_unexpected_response(err: gcs_sync::storage::Error, content: &str) {
     }
 }
 
-fn assert_not_found_response(err: gcs_sync::storage::Error) {
+fn assert_not_found_response(err: gcs_rsync::storage::Error) {
     match err {
-        gcs_sync::storage::Error::GcsResourceNotFound => (),
+        gcs_rsync::storage::Error::GcsResourceNotFound => (),
         e => panic!("expected GcsResourceNotFound error got {:?}", e),
     }
 }

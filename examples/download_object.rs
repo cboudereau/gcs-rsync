@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use futures::TryStreamExt;
-use gcs_sync::storage::{credentials, Object, ObjectClient, StorageResult};
+use gcs_rsync::storage::{credentials, Object, ObjectClient, StorageResult};
 use tokio::{
     fs::File,
     io::{AsyncWriteExt, BufWriter},

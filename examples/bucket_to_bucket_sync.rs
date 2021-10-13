@@ -1,5 +1,5 @@
 use futures::{StreamExt, TryStreamExt};
-use gcs_sync::{
+use gcs_rsync::{
     storage::credentials::authorizeduser,
     sync::{RSync, RSyncResult, ReaderWriter},
 };

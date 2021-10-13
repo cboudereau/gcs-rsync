@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use gcs_sync::{
+use gcs_rsync::{
     oauth2::token::AuthorizedUserCredentials,
     storage::{credentials, Object},
 };

@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use futures::{StreamExt, TryStreamExt};
-use gcs_sync::sync::{
+use gcs_rsync::sync::{
     DefaultRSync, DefaultSource, RMirrorStatus, RSync, RSyncStatus, RelativePath,
 };
 use tokio::io::AsyncWriteExt;
