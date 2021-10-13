@@ -106,7 +106,7 @@ where
     }
 }
 
-pub type FsRSync = RSync<crate::oauth2::token::AuthorizedUserCredentials>;
+pub type DefaultRSync = RSync<crate::oauth2::token::AuthorizedUserCredentials>;
 pub struct RSync<T> {
     source: ReaderWriterInternal<T>,
     dest: ReaderWriterInternal<T>,

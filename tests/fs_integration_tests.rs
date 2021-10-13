@@ -1,9 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use futures::{StreamExt, TryStreamExt};
-use gcs_sync::{
-    oauth2::token::AuthorizedUserCredentials,
-    sync::{DefaultSource, FsRSync, RMirrorStatus, RSync, RSyncStatus, RelativePath},
+use gcs_sync::sync::{
+    DefaultRSync, DefaultSource, RMirrorStatus, RSync, RSyncStatus, RelativePath,
 };
 use tokio::io::AsyncWriteExt;
 
@@ -68,7 +67,7 @@ async fn delete_files(file_names: &[PathBuf]) {
         .await;
 }
 
-async fn sync(fs_client: &FsRSync) -> Vec<RSyncStatus> {
+async fn sync(fs_client: &DefaultRSync) -> Vec<RSyncStatus> {
     let mut actual = fs_client
         .sync()
         .await
@@ -80,7 +79,7 @@ async fn sync(fs_client: &FsRSync) -> Vec<RSyncStatus> {
     actual
 }
 
-async fn mirror(fs_client: &FsRSync) -> Vec<RMirrorStatus> {
+async fn mirror(fs_client: &DefaultRSync) -> Vec<RMirrorStatus> {
     let mut actual = fs_client
         .mirror()
         .await

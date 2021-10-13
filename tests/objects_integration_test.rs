@@ -161,10 +161,10 @@ async fn test_delete_upload_download_delete() {
     let object = test_config.object("object.txt");
 
     let content = "hello";
-    assert_delete_err(&object_client, &object).await;
-    assert_upload_bytes(&object_client, &object, content).await;
-    assert_download_bytes(&object_client, &object, content).await;
-    assert_delete_ok(&object_client, &object).await;
+    assert_delete_err(object_client, &object).await;
+    assert_upload_bytes(object_client, &object, content).await;
+    assert_download_bytes(object_client, &object, content).await;
+    assert_delete_ok(object_client, &object).await;
 }
 
 #[tokio::test]
@@ -174,15 +174,15 @@ async fn test_get_object_ok() {
     let object = test_config.object("object.txt");
 
     let content = "hello";
-    assert_delete_err(&object_client, &object).await;
-    assert_upload_bytes(&object_client, &object, content).await;
+    assert_delete_err(object_client, &object).await;
+    assert_upload_bytes(object_client, &object, content).await;
 
     let partial_object = object_client.get(&object, "name,selfLink").await.unwrap();
 
     assert!(partial_object.name.unwrap().ends_with("object.txt"));
     assert!(partial_object.self_link.unwrap().ends_with("%2Fobject.txt"));
     assert_eq!(None, partial_object.crc32c);
-    assert_delete_ok(&object_client, &object).await;
+    assert_delete_ok(object_client, &object).await;
 }
 
 #[tokio::test]
@@ -205,7 +205,7 @@ async fn test_upload_with_detailed_error() {
     let object_client = &test_config.client;
     let object = Object::new("the_bad_bucket", "name");
 
-    let err = upload_bytes(&object_client, &object, "").await.unwrap_err();
+    let err = upload_bytes(object_client, &object, "").await.unwrap_err();
 
     assert_unexpected_response(err, "forbidden");
 }
@@ -223,7 +223,7 @@ async fn test_api_list_objects() {
 
     futures::stream::iter(test_objects.iter())
         .for_each_concurrent(12, |object| {
-            assert_upload_bytes(&object_client, object, "hello")
+            assert_upload_bytes(object_client, object, "hello")
         })
         .await;
 
@@ -245,7 +245,7 @@ async fn test_api_list_objects() {
     assert_eq!(count, result.len());
 
     futures::stream::iter(test_objects.iter())
-        .for_each_concurrent(12, |object| assert_delete_ok(&object_client, object))
+        .for_each_concurrent(12, |object| assert_delete_ok(object_client, object))
         .await;
 }
 
@@ -255,7 +255,7 @@ async fn test_crc32c_object() {
     let object_client = &test_config.client;
 
     let test_object = test_config.object("test_crc32c");
-    assert_upload_bytes(&object_client, &test_object, "hello world!").await;
+    assert_upload_bytes(object_client, &test_object, "hello world!").await;
 
     let objects_list_request = ObjectsListRequest {
         prefix: Some(test_config.list_prefix()),
@@ -274,7 +274,7 @@ async fn test_crc32c_object() {
     assert_eq!(1, result.len());
     let crc32c = result.pop().unwrap().crc32c.unwrap_or_default().to_u32();
     assert_eq!(1238062967, crc32c);
-    assert_delete_ok(&object_client, &test_object).await;
+    assert_delete_ok(object_client, &test_object).await;
 }
 
 fn assert_unexpected_response(err: gcs_sync::storage::Error, content: &str) {
