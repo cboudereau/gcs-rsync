@@ -17,8 +17,10 @@ impl FsTestConfig {
     fn new() -> Self {
         let base_path = {
             let uuid = uuid::Uuid::new_v4().to_hyphenated().to_string();
-            let p = PathBuf::from(format!("fs_integration_tests/{}/", uuid));
-            p
+            let mut tmp = std::env::temp_dir();
+            tmp.push("rsync_integration_tests");
+            tmp.push(uuid);
+            tmp
         };
         Self { base_path }
     }
@@ -33,7 +35,8 @@ impl FsTestConfig {
 
 impl Drop for FsTestConfig {
     fn drop(&mut self) {
-        std::fs::remove_dir_all(self.base_path.as_path()).unwrap();
+        let path = self.base_path.as_path();
+        std::fs::remove_dir_all(path).unwrap();
     }
 }
 
@@ -145,9 +148,9 @@ async fn test_fs_to_gcs_sync_and_mirror() {
     )
     .await
     .unwrap();
-    let fs_client = RSync::new(source, dest);
+    let rsync = RSync::new(source, dest);
 
-    let actual = sync(&fs_client).await;
+    let actual = sync(&rsync).await;
 
     assert_eq!(
         vec![
@@ -158,7 +161,7 @@ async fn test_fs_to_gcs_sync_and_mirror() {
         actual
     );
 
-    let actual = sync(&fs_client).await;
+    let actual = sync(&rsync).await;
 
     assert_eq!(
         vec![
@@ -172,7 +175,7 @@ async fn test_fs_to_gcs_sync_and_mirror() {
     let new_file = src_t.file_path("new.json");
     write_to_file(src_t.file_path("test.json").as_path(), "top new content").await;
     write_to_file(new_file.as_path(), "top new content").await;
-    let actual = sync(&fs_client).await;
+    let actual = sync(&rsync).await;
 
     assert_eq!(
         vec![
@@ -186,7 +189,7 @@ async fn test_fs_to_gcs_sync_and_mirror() {
 
     delete_files(&file_names[..]).await;
 
-    let actual = mirror(&fs_client).await;
+    let actual = mirror(&rsync).await;
 
     assert_eq!(
         vec![
@@ -200,6 +203,6 @@ async fn test_fs_to_gcs_sync_and_mirror() {
     );
     delete_file(new_file.as_path()).await;
 
-    let actual = mirror(&fs_client).await;
+    let actual = mirror(&rsync).await;
     assert_eq!(vec![deleted("new.json"),], actual);
 }
