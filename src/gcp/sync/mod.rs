@@ -196,7 +196,7 @@ where
     }
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RelativePath {
     path: String,
 }
@@ -244,14 +244,14 @@ impl std::fmt::Display for RSyncError {
 
 impl std::error::Error for RSyncError {}
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RSyncStatus {
     Created(RelativePath),
     Updated(RelativePath),
     AlreadySynced(RelativePath),
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RMirrorStatus {
     Synced(RSyncStatus),
     Deleted(RelativePath),
