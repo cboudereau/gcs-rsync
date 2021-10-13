@@ -135,11 +135,13 @@ async fn test_fs_to_gcs_sync_and_mirror() {
 
     let dst_t = GcsTestConfig::from_env().await;
 
+    let dst_bucket = dst_t.bucket();
+    let dst_prefix = dst_t.prefix();
     let source = DefaultSource::fs(src_t.base_path.as_path());
     let dest = DefaultSource::gcs(
-        dst_t.token,
-        dst_t.bucket.as_str(),
-        dst_t.prefix.to_str().unwrap(),
+        dst_t.token(),
+        dst_bucket.as_str(),
+        dst_prefix.to_str().unwrap(),
     )
     .await
     .unwrap();

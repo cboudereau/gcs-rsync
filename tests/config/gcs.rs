@@ -7,10 +7,10 @@ use gcs_sync::{
 
 #[allow(dead_code)] //remove this when this issue will be fixed: https://github.com/rust-lang/rust/issues/46379
 pub struct GcsTestConfig {
-    pub bucket: String,
-    pub prefix: PathBuf,
+    bucket: String,
+    prefix: PathBuf,
     list_prefix: String,
-    pub token: AuthorizedUserCredentials,
+    token: AuthorizedUserCredentials,
 }
 
 #[allow(dead_code)] //remove this when this issue will be fixed: https://github.com/rust-lang/rust/issues/46379
@@ -60,5 +60,17 @@ impl GcsTestConfig {
 
     pub fn list_prefix(&self) -> String {
         self.list_prefix.to_owned()
+    }
+
+    pub fn bucket(&self) -> String {
+        self.bucket.to_owned()
+    }
+
+    pub fn prefix(&self) -> PathBuf {
+        self.prefix.to_owned()
+    }
+
+    pub fn token(self) -> AuthorizedUserCredentials {
+        self.token
     }
 }

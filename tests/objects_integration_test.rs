@@ -25,7 +25,7 @@ async fn test_test_config() {
         "object name should end with /object_name"
     );
 
-    assert!(t.bucket.is_empty().not(), "bucket should not be empty");
+    assert!(t.bucket().is_empty().not(), "bucket should not be empty");
 }
 
 async fn assert_delete_err(
@@ -101,7 +101,7 @@ async fn assert_download_bytes(
 async fn test_delete_upload_download_delete() {
     let test_config = GcsTestConfig::from_env().await;
     let object = test_config.object("object.txt");
-    let object_client = ObjectClient::new(test_config.token).await.unwrap();
+    let object_client = ObjectClient::new(test_config.token()).await.unwrap();
 
     let content = "hello";
     assert_delete_err(&object_client, &object).await;
@@ -114,7 +114,7 @@ async fn test_delete_upload_download_delete() {
 async fn test_get_object_ok() {
     let test_config = GcsTestConfig::from_env().await;
     let object = test_config.object("object.txt");
-    let object_client = ObjectClient::new(test_config.token).await.unwrap();
+    let object_client = ObjectClient::new(test_config.token()).await.unwrap();
 
     let content = "hello";
     assert_delete_err(&object_client, &object).await;
@@ -132,7 +132,7 @@ async fn test_get_object_ok() {
 async fn test_get_object_not_found() {
     let test_config = GcsTestConfig::from_env().await;
     let object = test_config.object("object.txt");
-    let object_client = ObjectClient::new(test_config.token).await.unwrap();
+    let object_client = ObjectClient::new(test_config.token()).await.unwrap();
 
     let err = object_client
         .get(&object, "name,selfLink")
@@ -145,7 +145,7 @@ async fn test_get_object_not_found() {
 #[tokio::test]
 async fn test_upload_with_detailed_error() {
     let test_config = GcsTestConfig::from_env().await;
-    let object_client = ObjectClient::new(test_config.token).await.unwrap();
+    let object_client = ObjectClient::new(test_config.token()).await.unwrap();
     let object = Object::new("the_bad_bucket", "name");
 
     let err = upload_bytes(&object_client, &object, "").await.unwrap_err();
@@ -159,11 +159,12 @@ async fn test_api_list_objects() {
 
     let count = 11;
     let prefix = test_config.list_prefix();
+    let bucket = test_config.bucket();
     let test_objects = (0..count + 2)
         .map(|i| test_config.object(format!("object_{}", i).as_str()))
         .collect::<Vec<_>>();
 
-    let object_client = ObjectClient::new(test_config.token).await.unwrap();
+    let object_client = ObjectClient::new(test_config.token()).await.unwrap();
     futures::stream::iter(test_objects.iter())
         .for_each_concurrent(config::default::CONCURRENCY_LEVEL, |object| {
             assert_upload_bytes(&object_client, object, "hello")
@@ -178,7 +179,7 @@ async fn test_api_list_objects() {
     };
 
     let result: Vec<PartialObject> = object_client
-        .list(&test_config.bucket.to_owned(), &objects_list_request)
+        .list(bucket.as_str(), &objects_list_request)
         .await
         .take(count)
         .try_collect()
@@ -197,9 +198,10 @@ async fn test_api_list_objects() {
 #[tokio::test]
 async fn test_crc32c_object() {
     let test_config = GcsTestConfig::from_env().await;
+    let bucket = test_config.bucket();
     let prefix = test_config.list_prefix();
     let test_object = &test_config.object("test_crc32c");
-    let object_client = ObjectClient::new(test_config.token).await.unwrap();
+    let object_client = ObjectClient::new(test_config.token()).await.unwrap();
     assert_upload_bytes(&object_client, test_object, "hello world!").await;
 
     let objects_list_request = ObjectsListRequest {
@@ -210,7 +212,7 @@ async fn test_crc32c_object() {
     };
 
     let mut result: Vec<PartialObject> = object_client
-        .list(&test_config.bucket.to_owned(), &objects_list_request)
+        .list(bucket.as_str(), &objects_list_request)
         .await
         .try_collect()
         .await

@@ -10,11 +10,19 @@ use gcs_sync::{
 async fn main() -> RSyncResult<()> {
     let token_generator = authorizeduser::default().await.unwrap();
 
-    let source = ReaderWriter::gcs(token_generator, "test", "sync_test3/")
+    let home_dir = env!("HOME");
+    let test_prefix = env!("PREFIX_EXAMPLE");
+    let bucket = env!("BUCKET_EXAMPLE");
+
+    let source = ReaderWriter::gcs(token_generator, bucket, test_prefix)
         .await
         .unwrap();
 
-    let dest_folder = PathBuf::from_str("/test3").unwrap();
+    let dest_folder = {
+        let mut p = PathBuf::from_str(home_dir).unwrap();
+        p.push(test_prefix);
+        p
+    };
     let dest = ReaderWriter::fs(dest_folder.as_path());
 
     let rsync = RSync::new(source, dest);
