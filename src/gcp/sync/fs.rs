@@ -54,14 +54,20 @@ impl FsClient {
                 match state.pop() {
                     None => Ok(None),
                     Some(path) => {
-                        let mut read_dir = tokio::fs::read_dir(path)
-                            .await
-                            .map_err(RSyncError::FsIoError)?;
+                        let path = path.as_path();
+                        let mut read_dir = tokio::fs::read_dir(path).await.map_err(|err| {
+                            RSyncError::fs_io_error(format!("{:?} read dir failed", path), err)
+                        })?;
                         let mut files = Vec::new();
-                        while let Some(entry) =
-                            read_dir.next_entry().await.map_err(RSyncError::FsIoError)?
-                        {
-                            let metadata = entry.metadata().await.map_err(RSyncError::FsIoError)?;
+                        while let Some(entry) = read_dir.next_entry().await.map_err(|err| {
+                            RSyncError::fs_io_error(format!("{:?} next entry failed", path), err)
+                        })? {
+                            let metadata = entry.metadata().await.map_err(|err| {
+                                RSyncError::fs_io_error(
+                                    format!("{:?} reading metadata failed", entry.path()),
+                                    err,
+                                )
+                            })?;
                             if metadata.is_dir() {
                                 state.push(entry.path());
                             } else {
@@ -77,11 +83,12 @@ impl FsClient {
     }
 
     pub(super) async fn read(&self, path: &RelativePath) -> impl Stream<Item = RSyncResult<Bytes>> {
-        let file = fs::File::open(self.prefix.as_file_path(path).as_path())
-            .await
-            .unwrap();
+        let path = self.prefix.as_file_path(path);
+        let file = fs::File::open(path.as_path()).await.unwrap();
         FramedRead::new(file, BytesCodec::new())
-            .map_err(RSyncError::FsIoError)
+            .map_err(move |err| {
+                RSyncError::fs_io_error(format!("{:?} read failure", path.as_path()), err)
+            })
             .map_ok(|x| x.freeze())
     }
 
@@ -92,7 +99,9 @@ impl FsClient {
             let mut frame = FramedRead::new(file, BytesCodec::new());
 
             let mut crc32c: u32 = 0;
-            while let Some(data) = frame.try_next().await.map_err(RSyncError::FsIoError)? {
+            while let Some(data) = frame.try_next().await.map_err(|e| {
+                RSyncError::fs_io_error(format!("{:?} crc32c failed", file_path.as_path()), e)
+            })? {
                 crc32c = crc32c::crc32c_append(crc32c, &data);
             }
 
@@ -109,9 +118,9 @@ impl FsClient {
 
     pub(super) async fn delete(&self, path: &RelativePath) -> RSyncResult<()> {
         let file_path = self.prefix.as_file_path(path);
-        fs::remove_file(file_path.as_path())
-            .await
-            .map_err(RSyncError::FsIoError)
+        fs::remove_file(file_path.as_path()).await.map_err(|e| {
+            RSyncError::fs_io_error(format!("{:?} remove file failed", file_path.as_path()), e)
+        })
     }
 
     pub(super) async fn write<S>(&self, path: &RelativePath, mut stream: S) -> RSyncResult<()>
@@ -121,25 +130,32 @@ impl FsClient {
         let file_path = self.prefix.as_file_path(path);
 
         if let Some(parent) = file_path.parent() {
-            fs::create_dir_all(parent)
-                .await
-                .map_err(RSyncError::FsIoError)?
+            fs::create_dir_all(parent).await.map_err(|e| {
+                RSyncError::fs_io_error(format!("{:?} create dir all failed", parent), e)
+            })?
         }
 
-        let file = fs::File::create(&file_path)
-            .await
-            .map_err(RSyncError::FsIoError)?;
+        let file = fs::File::create(file_path.as_path()).await.map_err(|e| {
+            RSyncError::fs_io_error(format!("{:?} create file failed", file_path.as_path()), e)
+        })?;
 
         let mut buf_writer = BufWriter::new(file);
 
         while let Some(data) = stream.try_next().await? {
-            buf_writer
-                .write_all(&data)
-                .await
-                .map_err(RSyncError::FsIoError)?;
+            buf_writer.write_all(&data).await.map_err(|e| {
+                RSyncError::fs_io_error(
+                    format!("{:?} buffered write to file failed", file_path.as_path()),
+                    e,
+                )
+            })?;
         }
 
-        buf_writer.flush().await.map_err(RSyncError::FsIoError)?;
+        buf_writer.flush().await.map_err(|e| {
+            RSyncError::fs_io_error(
+                format!("{:?} buffer flush to file failed", file_path.as_path()),
+                e,
+            )
+        })?;
 
         Ok(())
     }

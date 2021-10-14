@@ -329,8 +329,23 @@ impl Entry {
 pub enum RSyncError {
     MissingFieldsInGcsResponse(String),
     StorageError(super::storage::Error),
-    FsIoError(std::io::Error),
+    FsIoError {
+        message: String,
+        error: std::io::Error,
+    },
     EmptyRelativePathError,
+}
+
+impl RSyncError {
+    fn fs_io_error<T>(message: T, error: std::io::Error) -> RSyncError
+    where
+        T: AsRef<str>,
+    {
+        RSyncError::FsIoError {
+            message: message.as_ref().to_owned(),
+            error,
+        }
+    }
 }
 
 impl std::fmt::Display for RSyncError {
