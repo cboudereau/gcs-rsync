@@ -21,6 +21,7 @@ jobs:
 
       TEST_BUCKET: ${{ secrets.TEST_BUCKET }}
       TEST_PREFIX: ${{ secrets.TEST_PREFIX }}
+      TEST_SERVICE_ACCOUNT: ${{ secrets.TEST_SERVICE_ACCOUNT }}
 
     steps:
       - uses: actions/checkout@v2
