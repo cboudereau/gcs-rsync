@@ -1,3 +1,5 @@
+use std::path::{Path, PathBuf};
+
 pub mod token;
 
 #[derive(Debug)]
@@ -11,6 +13,7 @@ pub enum Error {
         error: std::env::VarError,
     },
     IoError {
+        path: PathBuf,
         message: String,
         error: std::io::Error,
     },
@@ -32,12 +35,18 @@ impl Error {
         }
     }
 
-    pub fn io_error<T>(message: T, error: std::io::Error) -> Error
+    pub fn io_error<T, U>(message: T, path: U, error: std::io::Error) -> Error
     where
         T: AsRef<str>,
+        U: AsRef<Path>,
     {
         let message = message.as_ref().to_owned();
-        Error::IoError { message, error }
+        let path = path.as_ref().to_owned();
+        Error::IoError {
+            message,
+            error,
+            path,
+        }
     }
 
     pub fn env_var_error(key: &str, error: std::env::VarError) -> Error {
