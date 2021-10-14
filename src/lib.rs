@@ -1,11 +1,11 @@
 //! Fast and native Google Cloud Storage rsync
 //!
-//! - fast: gcs-rsync performance are better than gsutil rsync: see [benchmark](https://github.com/cboudereau/gcs-rsync#benchmark)
-//! - native: gcs-rsync can be used without gcloud components
-//! - gcs auth supported: authorized user (dev account) and service account
-//! - features: source and destination can be either fs (file system) or gcs (Google Cloud Storage) meaning that any combination is allowed
+//! - __fast__: gcs-rsync performance are better than gsutil rsync: see [benchmark](https://github.com/cboudereau/gcs-rsync#benchmark)
+//! - __native__: gcs-rsync can be used without gcloud components
+//! - __gcs auth__: __authorized user__ (dev account) and __service account__
+//! - __features__: source and destination can be either fs (_file system_) or gcs (_Google Cloud Storage_) meaning that any combination is allowed
 //!
-//! Be careful with the mirror feature as it will delete all extras meaning that entry not found in the source is deleted from the destination
+//! __Be careful__ with the __mirror__ feature as it will __delete all extras__ meaning that entry not found in the source is deleted from the destination
 //!
 //! # Quick Start
 //! ```rust
@@ -53,6 +53,7 @@
 //! ```
 //! # Sync and Mirror examples
 //! - [`gcp::sync::RSync`] examples
+//! - [other examples](https://github.com/cboudereau/gcs-rsync/tree/main/examples)
 mod gcp;
 
 pub use gcp::oauth2;
