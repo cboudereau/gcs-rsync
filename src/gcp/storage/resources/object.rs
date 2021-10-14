@@ -83,7 +83,7 @@ impl Object {
             return Err(Error::GcsInvalidObjectName);
         }
 
-        if name.is_empty() {
+        if name.is_empty() || name.starts_with(".") {
             return Err(Error::GcsInvalidObjectName);
         }
 
@@ -239,7 +239,7 @@ where
 mod tests {
     use std::{convert::TryInto, str::FromStr};
 
-    use crate::storage::{Bucket, Object};
+    use crate::storage::{Bucket, Error, Object};
 
     use super::PartialObject;
 
@@ -251,6 +251,19 @@ mod tests {
         )
     }
 
+    #[test]
+    fn test_invalid_object() {
+        fn assert_object_error(bucket: &str, name: &str) {
+            assert!(matches!(
+                Object::new(bucket, name).unwrap_err(),
+                Error::GcsInvalidObjectName
+            ))
+        }
+        assert_object_error("", "name");
+        assert_object_error("bucket", "");
+        assert_object_error("bucket", ".");
+        assert_object_error("bucket", "..");
+    }
     #[test]
     fn test_object_display() {
         let o = Object::new("hello", "world").unwrap();
