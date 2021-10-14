@@ -15,7 +15,7 @@ gcs-sync is faster than `gsutil rsync` when files change a lot while performance
 - [x] Benchmarks
 - [x] Sync/Mirror integration tests
 - [x] Doc crate
-- [ ] CI/CD
+- [x] CI/CD
 - [ ] Publish crate
 
 ### Benchmark
