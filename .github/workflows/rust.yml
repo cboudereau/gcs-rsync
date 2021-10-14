@@ -10,25 +10,27 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+  EXAMPLE_BUCKET: ${{ secrets.EXAMPLE_BUCKET }}
+  EXAMPLE_PREFIX: ${{ secrets.EXAMPLE_PREFIX }}
+
+  TEST_BUCKET: ${{ secrets.TEST_BUCKET }}
+  TEST_PREFIX: ${{ secrets.TEST_PREFIX }}
+  TEST_SERVICE_ACCOUNT: ${{ secrets.TEST_SERVICE_ACCOUNT }}
+
 jobs:
-  build:
-
+  lint: 
     runs-on: ubuntu-latest
-
-    env:
-      EXAMPLE_BUCKET: ${{ secrets.EXAMPLE_BUCKET }}
-      EXAMPLE_PREFIX: ${{ secrets.EXAMPLE_PREFIX }}
-
-      TEST_BUCKET: ${{ secrets.TEST_BUCKET }}
-      TEST_PREFIX: ${{ secrets.TEST_PREFIX }}
-      TEST_SERVICE_ACCOUNT: ${{ secrets.TEST_SERVICE_ACCOUNT }}
-
     steps:
       - uses: actions/checkout@v2
       - name: fmt
         run: cargo fmt --all -- --check
       - name: clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
       - name: build
         run: cargo build --verbose
       - name: unit tests
