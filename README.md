@@ -4,32 +4,18 @@ Lightweight and efficient faster than [Google Cloud Storage rsync](https://cloud
 
 gcs-sync is faster than `gsutil rsync` when files change a lot while performance is similar to `gsutil` when there is no changes.
 
-- [x] OAuth2 service account (default, from and from_file)
-- [x] OAuth2 dev (default, from and from_file)
-- [x] OAuth2 Integration tests + examples
-- [x] Useful diagnostic on error (raw json response)
-- [x] List objects with better performance than gsutil by supporting [GCS Partial Response](https://cloud.google.com/storage/docs/json_api#partial-response)
-- [x] Upload/Download/Get/Delete objects + Integrations tests and examples
-- [x] Sync local folder (one way sync without delete remote files with crc32c support)
-- [x] Mirror local folder (sync + delete remotes files)
-- [x] Benchmarks
-- [x] Sync/Mirror integration tests
-- [x] Doc crate
-- [x] CI/CD
-- [ ] Publish crate
-
-### Benchmark
+## Benchmark
 
 Important note about gsutil: The `gsutils ls` command does not list all object items by default but instead list all prefixes while adding the `-r` flag slowdown `gsutil` performance. The `ls` performance command is very different to the `rsync` implementation.
 
-#### new files only (first time sync)
+### new files only (first time sync)
 
 - gcs-sync: 2.2s/7MB
 - gsutil: 9.93s/47MB
 
 **winner**: gcs-sync
 
-##### gcs-sync sync bench
+#### gcs-sync sync bench
 
 ```bash
 rm -rf ~/Documents/test4 && cargo build --release --examples && /usr/bin/time -lp -- ./target/release/examples/bucket_to_folder_sync
@@ -58,10 +44,10 @@ sys          0.21
              3895296  peak memory footprint
 ```
 
-##### gsutil sync bench
+#### gsutil sync bench
 
 ```bash
-rm -rf ~/Documents/gsutil_test4 && mkdir ~/Documents/gsutil_test4 && /usr/bin/time -lp --  gsutil -m rsync -r gs://dev-bucket/sync_test4/ ~/Documents/gsutil_test4/
+rm -rf ~/Documents/gsutil_test4 && mkdir ~/Documents/gsutil_test4 && /usr/bin/time -lp --  gsutil -m -q rsync -r gs://dev-bucket/sync_test4/ ~/Documents/gsutil_test4/
 ```
 
 ```
@@ -88,14 +74,14 @@ sys          2.35
               593920  peak memory footprint
 ```
 
-#### no change (second time sync)
+### no change (second time sync)
 
 - gcs-sync: 1.79s/8MB
 - gsutil: 2.18s/47MB
 
 **winner**: no clear winner, but at least gcs-sync perf is similar to `gsutil rync` when there is no modification (which is quite rare).
 
-##### gcs-sync sync bench
+#### gcs-sync sync bench
 
 ```bash
 cargo build --release --examples && /usr/bin/time -lp -- ./target/release/examples/bucket_to_folder_sync
@@ -124,10 +110,10 @@ sys          0.12
              4141056  peak memory footprint
 ```
 
-##### gsutil sync bench
+#### gsutil sync bench
 
 ```bash
-/usr/bin/time -lp --  gsutil -m rsync -r gs://test-bucket/sync_test4/ ~/Documents/gsutil_test4/
+/usr/bin/time -lp --  gsutil -m -q rsync -r gs://test-bucket/sync_test4/ ~/Documents/gsutil_test4/
 ```
 
 ```
@@ -153,20 +139,20 @@ sys          0.66
               602112  peak memory footprint
 ```
 
-#### gsutil rsync config
+### gsutil rsync config
 
 ```bash
-gsutil -m rsync -r -d ./your-dir gs://your-bucket
+gsutil -m -q rsync -r -d ./your-dir gs://your-bucket
 ```
 
 ```bash
-/usr/bin/time -lp --  gsutil -m rsync -r gs://dev-bucket/sync_test4/ ~/Documents/gsutil_test4/
+/usr/bin/time -lp --  gsutil -m -q rsync -r gs://dev-bucket/sync_test4/ ~/Documents/gsutil_test4/
 ```
 
 - [commands](https://cloud.google.com/storage/docs/gsutil/commands/rsync)
 - [crc32c for gsutil](https://cloud.google.com/storage/docs/gsutil/addlhelp/CRC32CandInstallingcrcmod)
 
-# About authentication
+## About authentication
 
 All default functions related to authentication use GOOGLE_APPLICATION_CREDENTIALS env var as default conf like official Google libraries do on other languages (golang, dotnet)
 
@@ -174,7 +160,7 @@ Other functions (from and from_file) provide the custom integration mode.
 
 For more info about OAuth2, see the related README in the oauth2 mod.
 
-# How to run tests
+## How to run tests
 
 ## Unit tests
 
@@ -188,7 +174,7 @@ cargo test --lib
 TEST_SERVICE_ACCOUNT=<PathToAServiceAccount> TEST_BUCKET=<BUCKET> TEST_PREFIX=<PREFIX> cargo test --no-fail-fast
 ```
 
-## Example
+## Examples
 
 ### Upload object
 
@@ -249,3 +235,19 @@ apk add --no-cache musl-dev pkgconfig openssl-dev
 
 LDFLAGS="-static -L/usr/local/musl/lib" LD_LIBRARY_PATH=/usr/local/musl/lib:$LD_LIBRARY_PATH CFLAGS="-I/usr/local/musl/include" PKG_CONFIG_PATH=/usr/local/musl/lib/pkgconfig cargo build --release --target=x86_64-unknown-linux-musl --example bucket_to_folder_sync
 ```
+
+## TODO
+
+- [x] OAuth2 service account (default, from and from_file)
+- [x] OAuth2 dev (default, from and from_file)
+- [x] OAuth2 Integration tests + examples
+- [x] Useful diagnostic on error (raw json response)
+- [x] List objects with better performance than gsutil by supporting [GCS Partial Response](https://cloud.google.com/storage/docs/json_api#partial-response)
+- [x] Upload/Download/Get/Delete objects + Integrations tests and examples
+- [x] Sync local folder (one way sync without delete remote files with crc32c support)
+- [x] Mirror local folder (sync + delete remotes files)
+- [x] Benchmarks
+- [x] Sync/Mirror integration tests
+- [x] Doc crate
+- [x] CI/CD
+- [x] Publish crate
