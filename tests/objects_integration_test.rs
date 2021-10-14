@@ -240,7 +240,7 @@ fn assert_unexpected_response(err: gcs_rsync::storage::Error, content: &str) {
 
 fn assert_not_found_response(err: gcs_rsync::storage::Error) {
     match err {
-        gcs_rsync::storage::Error::GcsResourceNotFound => (),
+        gcs_rsync::storage::Error::GcsResourceNotFound { .. } => (),
         e => panic!("expected GcsResourceNotFound error got {:?}", e),
     }
 }

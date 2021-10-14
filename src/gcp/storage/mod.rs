@@ -75,8 +75,9 @@ pub enum Error {
     GcsHttpError(reqwest::Error),
     GcsUnexpectedResponse(serde_json::Value),
     GcsPartialResponseError(String),
+    GcsInvalidUrl { url: String, message: String },
     GcsInvalidObjectName,
-    GcsResourceNotFound,
+    GcsResourceNotFound { url: String },
 }
 
 pub type StorageResult<T> = std::result::Result<T, Error>;

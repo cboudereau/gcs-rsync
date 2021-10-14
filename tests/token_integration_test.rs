@@ -31,7 +31,7 @@ async fn test_token_service_account_with_detailed_error() {
     let path = env!("TEST_SERVICE_ACCOUNT");
     let sac = ServiceAccountCredentials::from_file(path).await.unwrap();
     match sac.with_scope("").get(&client).await.unwrap_err() {
-        gcs_rsync::oauth2::Error::UnexpectedApiResponse(actual) => {
+        gcs_rsync::oauth2::Error::UnexpectedApiResponse { json: actual, .. } => {
             let expected: serde_json::Value =
             serde_json::from_str(r#"{ "error": "invalid_scope", "error_description": "Invalid OAuth scope or ID token audience provided." }"#)
                 .unwrap();

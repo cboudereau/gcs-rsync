@@ -44,14 +44,19 @@ impl<T: TokenGenerator> StorageClient<T> {
         }
     }
 
-    async fn success_response(response: reqwest::Response) -> StorageResult<reqwest::Response> {
+    async fn success_response(
+        url: &str,
+        response: reqwest::Response,
+    ) -> StorageResult<reqwest::Response> {
         let status = response.status();
         if status.is_success() {
             return Ok(response);
         }
 
         if status == reqwest::StatusCode::NOT_FOUND {
-            return Err(super::Error::GcsResourceNotFound);
+            return Err(super::Error::GcsResourceNotFound {
+                url: url.to_owned(),
+            });
         }
 
         let err = response.json().await.map_err(super::Error::GcsHttpError)?;
@@ -67,7 +72,7 @@ impl<T: TokenGenerator> StorageClient<T> {
             .send()
             .await
             .map_err(super::Error::GcsHttpError)?;
-        Self::success_response(response).await?;
+        Self::success_response(url, response).await?;
         Ok(())
     }
 
@@ -87,7 +92,7 @@ impl<T: TokenGenerator> StorageClient<T> {
             .await
             .map_err(super::Error::GcsHttpError)?;
 
-        Self::success_response(response).await?;
+        Self::success_response(url, response).await?;
         Ok(())
     }
 
@@ -109,7 +114,7 @@ impl<T: TokenGenerator> StorageClient<T> {
             .await
             .map_err(super::Error::GcsHttpError)?;
 
-        Ok(Self::success_response(response)
+        Ok(Self::success_response(url, response)
             .await?
             .bytes_stream()
             .map_err(super::Error::GcsHttpError))
@@ -129,7 +134,7 @@ impl<T: TokenGenerator> StorageClient<T> {
             .send()
             .await
             .map_err(super::Error::GcsHttpError)?;
-        let r: super::super::DeserializedResponse<R> = Self::success_response(response)
+        let r: super::super::DeserializedResponse<R> = Self::success_response(url, response)
             .await?
             .json()
             .await

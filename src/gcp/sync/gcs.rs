@@ -136,7 +136,7 @@ where
 
         match entry {
             Ok(e) => Ok(Some(e)),
-            Err(RSyncError::StorageError(StorageError::GcsResourceNotFound)) => Ok(None),
+            Err(RSyncError::StorageError(StorageError::GcsResourceNotFound { .. })) => Ok(None),
             Err(e) => Err(e),
         }
     }
@@ -150,7 +150,7 @@ where
             .map_err(RSyncError::StorageError);
         match entry {
             Ok(_) => Ok(true),
-            Err(RSyncError::StorageError(StorageError::GcsResourceNotFound)) => Ok(false),
+            Err(RSyncError::StorageError(StorageError::GcsResourceNotFound { .. })) => Ok(false),
             Err(err) => Err(err),
         }
     }
@@ -159,7 +159,7 @@ where
         let o = self.object_prefix.as_object(path)?;
         let delete_result = self.client.delete(&o).await;
         match delete_result {
-            Ok(_) | Err(StorageError::GcsResourceNotFound) => Ok(()),
+            Ok(_) | Err(StorageError::GcsResourceNotFound { .. }) => Ok(()),
             Err(e) => Err(RSyncError::StorageError(e)),
         }
     }

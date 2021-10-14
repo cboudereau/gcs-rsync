@@ -59,7 +59,10 @@ impl FromStr for Object {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         s.strip_prefix("gs://")
             .and_then(|part| part.split_once('/'))
-            .ok_or(Error::GcsInvalidObjectName)
+            .ok_or(Error::GcsInvalidUrl {
+                url: s.to_owned(),
+                message: "gs url should be gs://bucket/object/path/name".to_owned(),
+            })
             .and_then(|(bucket, name)| Object::new(bucket, name))
     }
 }
