@@ -32,7 +32,11 @@ impl Error {
         }
     }
 
-    pub fn io_error(message: String, error: std::io::Error) -> Error {
+    pub fn io_error<T>(message: T, error: std::io::Error) -> Error
+    where
+        T: AsRef<str>,
+    {
+        let message = message.as_ref().to_owned();
         Error::IoError { message, error }
     }
 
