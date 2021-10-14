@@ -1,8 +1,10 @@
 # gcs-rsync
 
-[![crates.io]](https://img.shields.io/crates/v/gcs-rsync.svg)
 [![build](https://github.com/cboudereau/gcs-rsync/workflows/build/badge.svg?branch=main)](https://github.com/cboudereau/gcs-rsync/workflows/build)
+[![crates.io](https://img.shields.io/crates/v/gcs-rsync.svg)](https://crates.io/crates/gcs-rsync)
 [![docs.rs](https://docs.rs/gcs-rsync/badge.svg)](https://docs.rs/gcs-rsync)
+
+
 
 Lightweight and efficient Rust gcs rsync for Google Cloud Storage.
 
