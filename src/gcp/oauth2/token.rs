@@ -94,7 +94,7 @@ impl TokenGenerator for AuthorizedUserCredentials {
             .map_err(Error::HttpError)?;
         token
             .into_result()
-            .map_err(super::Error::UnexpectedApiResponse)
+            .map_err(super::Error::unexpected_api_response::<Token>)
     }
 }
 
@@ -138,7 +138,7 @@ impl TokenGenerator for ServiceAccountCredentials {
         token
             .into_result()
             .map(|t| t.with_scope(scope))
-            .map_err(super::Error::UnexpectedApiResponse)
+            .map_err(super::Error::unexpected_api_response::<Token>)
     }
 }
 
@@ -146,7 +146,7 @@ fn from_str<T>(str: &str) -> TokenResult<T>
 where
     T: serde::de::DeserializeOwned,
 {
-    serde_json::from_str(str).map_err(Error::DeserializationError)
+    serde_json::from_str(str).map_err(Error::deserialization_error::<T>)
 }
 
 async fn from_file<T, U>(file_path: T) -> TokenResult<U>
@@ -154,9 +154,14 @@ where
     T: AsRef<Path>,
     U: serde::de::DeserializeOwned,
 {
-    tokio::fs::read_to_string(file_path)
+    tokio::fs::read_to_string(file_path.as_ref())
         .await
-        .map_err(Error::IoError)
+        .map_err(|err| {
+            Error::io_error(
+                format!("error while reading file {:?}", file_path.as_ref()),
+                err,
+            )
+        })
         .and_then(|f| from_str(f.as_str()))
 }
 
@@ -164,8 +169,10 @@ async fn default<T>() -> TokenResult<T>
 where
     T: serde::de::DeserializeOwned,
 {
-    let default_path =
-        std::env::var("GOOGLE_APPLICATION_CREDENTIALS").map_err(Error::EnvVarError)?;
+    let default_path = {
+        let key = "GOOGLE_APPLICATION_CREDENTIALS";
+        std::env::var(key).map_err(|err| Error::env_var_error(key, err))?
+    };
     from_file(default_path).await
 }
 
