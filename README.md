@@ -14,7 +14,7 @@ gcs-sync is faster than `gsutil rsync` when files change a lot while performance
 - [x] Mirror local folder (sync + delete remotes files)
 - [x] Benchmarks
 - [x] Sync/Mirror integration tests
-- [ ] Doc crate
+- [x] Doc crate
 - [ ] CI/CD
 - [ ] Publish crate
 
