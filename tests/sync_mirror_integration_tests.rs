@@ -98,23 +98,23 @@ async fn mirror(fs_client: &DefaultRSync) -> Vec<RMirrorStatus> {
 }
 
 fn created(path: &str) -> RSyncStatus {
-    RSyncStatus::Created(RelativePath::new(path))
+    RSyncStatus::Created(RelativePath::new(path).unwrap())
 }
 
 fn updated(path: &str) -> RSyncStatus {
-    RSyncStatus::Updated(RelativePath::new(path))
+    RSyncStatus::Updated(RelativePath::new(path).unwrap())
 }
 
 fn already_sinced(path: &str) -> RSyncStatus {
-    RSyncStatus::AlreadySynced(RelativePath::new(path))
+    RSyncStatus::AlreadySynced(RelativePath::new(path).unwrap())
 }
 
 fn deleted(path: &str) -> RMirrorStatus {
-    RMirrorStatus::Deleted(RelativePath::new(path))
+    RMirrorStatus::Deleted(RelativePath::new(path).unwrap())
 }
 
 fn not_deleted(path: &str) -> RMirrorStatus {
-    RMirrorStatus::NotDeleted(RelativePath::new(path))
+    RMirrorStatus::NotDeleted(RelativePath::new(path).unwrap())
 }
 
 fn synced(x: RSyncStatus) -> RMirrorStatus {

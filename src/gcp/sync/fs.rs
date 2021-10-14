@@ -22,7 +22,7 @@ impl FsPrefix {
         Self { base_path }
     }
 
-    fn as_relative_path(&self, name: &Path) -> RelativePath {
+    fn as_relative_path(&self, name: &Path) -> RSyncResult<RelativePath> {
         let path = name
             .strip_prefix(self.base_path.as_path())
             .unwrap_or(name)
@@ -65,8 +65,7 @@ impl FsClient {
                             if metadata.is_dir() {
                                 state.push(entry.path());
                             } else {
-                                files
-                                    .push(Ok(self.prefix.as_relative_path(entry.path().as_path())));
+                                files.push(self.prefix.as_relative_path(entry.path().as_path()));
                             }
                         }
                         Ok(Some((futures::stream::iter(files), state)))

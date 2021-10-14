@@ -1,6 +1,6 @@
 use std::{convert::TryInto, fmt::Display, str::FromStr};
 
-use crate::storage::Error;
+use crate::storage::{Error, StorageResult};
 
 #[derive(Debug, PartialEq, serde::Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -53,6 +53,17 @@ impl Display for Object {
     }
 }
 
+impl FromStr for Object {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.strip_prefix("gs://")
+            .and_then(|part| part.split_once('/'))
+            .ok_or(Error::GcsInvalidObjectName)
+            .and_then(|(bucket, name)| Object::new(bucket, name))
+    }
+}
+
 type GsUrl = String;
 
 const BASE_URL: &str = "https://storage.googleapis.com/storage/v1";
@@ -67,11 +78,20 @@ impl Object {
         return format!("gs://{}/{}", &self.bucket, &self.name);
     }
 
-    pub fn new(bucket: &str, name: &str) -> Self {
-        Self {
+    /// References: `<https://cloud.google.com/storage/docs/naming-objects>`
+    pub fn new(bucket: &str, name: &str) -> StorageResult<Self> {
+        if bucket.is_empty() {
+            return Err(Error::GcsInvalidObjectName);
+        }
+
+        if name.is_empty() || name.starts_with(".") {
+            return Err(Error::GcsInvalidObjectName);
+        }
+
+        Ok(Self {
             bucket: bucket.to_owned(),
             name: name.to_owned(),
-        }
+        })
     }
 
     pub fn url(&self) -> String {
@@ -218,22 +238,43 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::convert::TryInto;
+    use std::{convert::TryInto, str::FromStr};
 
-    use crate::storage::{Bucket, Object};
+    use crate::storage::{Bucket, Error, Object};
 
     use super::PartialObject;
 
     #[test]
+    fn fn_gs_url_parsing_to_object() {
+        assert_eq!(
+            Object::new("hello", "world/object").unwrap(),
+            Object::from_str("gs://hello/world/object").unwrap(),
+        )
+    }
+
+    #[test]
+    fn test_invalid_object() {
+        fn assert_object_error(bucket: &str, name: &str) {
+            assert!(matches!(
+                Object::new(bucket, name).unwrap_err(),
+                Error::GcsInvalidObjectName
+            ))
+        }
+        assert_object_error("", "name");
+        assert_object_error("bucket", "");
+        assert_object_error("bucket", ".");
+        assert_object_error("bucket", "..");
+    }
+    #[test]
     fn test_object_display() {
-        let o = Object::new("hello", "world");
+        let o = Object::new("hello", "world").unwrap();
         assert_eq!("gs://hello/world", o.gs_url());
         assert_eq!("gs://hello/world", format!("{}", o));
     }
 
     #[test]
     fn test_object_url() {
-        let o = Object::new("hello/hello", "world/world");
+        let o = Object::new("hello/hello", "world/world").unwrap();
         assert_eq!(
             "https://storage.googleapis.com/storage/v1/b/hello%2Fhello/o/world%2Fworld",
             o.url()
@@ -242,7 +283,7 @@ mod tests {
 
     #[test]
     fn test_object_upload_url() {
-        let o = Object::new("hello/hello", "world/world");
+        let o = Object::new("hello/hello", "world/world").unwrap();
         assert_eq!(
             "https://storage.googleapis.com/upload/storage/v1/b/hello%2Fhello/o?uploadType=media&name=world%2Fworld",
             o.upload_url()
@@ -266,6 +307,9 @@ mod tests {
             ..Default::default()
         };
 
-        assert_eq!(Object::new("hello", "world"), p.try_into().unwrap());
+        assert_eq!(
+            Object::new("hello", "world").unwrap(),
+            p.try_into().unwrap()
+        );
     }
 }

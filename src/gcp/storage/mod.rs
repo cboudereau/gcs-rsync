@@ -75,6 +75,7 @@ pub enum Error {
     GcsHttpError(reqwest::Error),
     GcsUnexpectedResponse(serde_json::Value),
     GcsPartialResponseError(String),
+    GcsInvalidObjectName,
     GcsResourceNotFound,
 }
 

@@ -48,16 +48,20 @@ impl ObjectPrefix {
         }
     }
 
-    fn as_object(&self, name: &RelativePath) -> Object {
+    fn as_object(&self, name: &RelativePath) -> RSyncResult<Object> {
         let name = name.path.as_str();
-        if self.prefix.is_empty() {
-            return Object::new(&self.bucket, name);
-        }
 
-        return Object::new(&self.bucket, format!("{}{}", &self.prefix, name).as_str());
+        let object = {
+            if self.prefix.is_empty() {
+                Object::new(&self.bucket, name)
+            } else {
+                Object::new(&self.bucket, format!("{}{}", &self.prefix, name).as_str())
+            }
+        };
+        object.map_err(RSyncError::StorageError)
     }
 
-    fn as_relative_path(&self, name: &str) -> RelativePath {
+    fn as_relative_path(&self, name: &str) -> RSyncResult<RelativePath> {
         let prefix = if self.prefix.is_empty() {
             "/"
         } else {
@@ -94,20 +98,22 @@ where
             .map(move |r| {
                 r.and_then(|po| {
                     po.name
-                        .map(|name| self.object_prefix.as_relative_path(&name))
                         .ok_or_else(|| RSyncError::MissingFieldsInGcsResponse("name".to_owned()))
+                        .and_then(|name| self.object_prefix.as_relative_path(&name))
                 })
             })
     }
 
     pub(super) async fn read(&self, path: &RelativePath) -> impl Stream<Item = RSyncResult<Bytes>> {
-        let o = self.object_prefix.as_object(path);
-        let download_result = self
-            .client
-            .download(&o)
-            .await
-            .map(|x| x.map_err(RSyncError::StorageError))
-            .map_err(RSyncError::StorageError);
+        let download_result = async {
+            let o = self.object_prefix.as_object(path)?;
+            self.client
+                .download(&o)
+                .await
+                .map(|x| x.map_err(RSyncError::StorageError))
+                .map_err(RSyncError::StorageError)
+        }
+        .await;
 
         futures::stream::once(futures::future::ready(download_result)).try_flatten()
     }
@@ -119,7 +125,7 @@ where
                 .ok_or_else(|| RSyncError::MissingFieldsInGcsResponse("crc32c".to_owned()))
         }
 
-        let o = &self.object_prefix.as_object(path);
+        let o = &self.object_prefix.as_object(path)?;
         let entry = self
             .client
             .get(o, "crc32c")
@@ -136,7 +142,7 @@ where
     }
 
     pub(super) async fn exists(&self, path: &RelativePath) -> RSyncResult<bool> {
-        let o = &self.object_prefix.as_object(path);
+        let o = &self.object_prefix.as_object(path)?;
         let entry = self
             .client
             .get(o, "name")
@@ -150,7 +156,7 @@ where
     }
 
     pub(super) async fn delete(&self, path: &RelativePath) -> RSyncResult<()> {
-        let o = self.object_prefix.as_object(path);
+        let o = self.object_prefix.as_object(path)?;
         let delete_result = self.client.delete(&o).await;
         match delete_result {
             Ok(_) | Err(StorageError::GcsResourceNotFound) => Ok(()),
@@ -163,7 +169,7 @@ where
     where
         S: futures::TryStream<Ok = bytes::Bytes, Error = RSyncError> + Send + Sync + 'static,
     {
-        let o = &self.object_prefix.as_object(path);
+        let o = &self.object_prefix.as_object(path)?;
         self.client
             .upload(o, stream)
             .await
@@ -181,56 +187,76 @@ mod tests {
     #[test]
     fn test_object_prefix_as_object() {
         assert_eq!(
-            Object::new("bucket", "hello"),
-            ObjectPrefix::new("bucket", "").as_object(&RelativePath::new("hello"))
+            Object::new("bucket", "hello").unwrap(),
+            ObjectPrefix::new("bucket", "")
+                .as_object(&RelativePath::new("hello").unwrap())
+                .unwrap()
         );
 
         assert_eq!(
-            Object::new("bucket", "hello"),
-            ObjectPrefix::new("bucket", "").as_object(&RelativePath::new("/hello"))
+            Object::new("bucket", "hello").unwrap(),
+            ObjectPrefix::new("bucket", "")
+                .as_object(&RelativePath::new("/hello").unwrap())
+                .unwrap()
         );
 
         assert_eq!(
-            Object::new("bucket", "prefix/hello"),
-            ObjectPrefix::new("bucket", "prefix").as_object(&RelativePath::new("hello"))
+            Object::new("bucket", "prefix/hello").unwrap(),
+            ObjectPrefix::new("bucket", "prefix")
+                .as_object(&RelativePath::new("hello").unwrap())
+                .unwrap()
         );
 
         assert_eq!(
-            Object::new("bucket", "prefix/hello/world"),
-            ObjectPrefix::new("bucket", "/prefix/hello").as_object(&RelativePath::new("world"))
+            Object::new("bucket", "prefix/hello/world").unwrap(),
+            ObjectPrefix::new("bucket", "/prefix/hello")
+                .as_object(&RelativePath::new("world").unwrap())
+                .unwrap()
         );
     }
 
     #[test]
     fn test_object_prefix() {
         assert_eq!(
-            RelativePath::new("hello"),
-            ObjectPrefix::new("bucket", "").as_relative_path("hello")
+            RelativePath::new("hello").unwrap(),
+            ObjectPrefix::new("bucket", "")
+                .as_relative_path("hello")
+                .unwrap()
         );
 
         assert_eq!(
-            RelativePath::new("hello"),
-            ObjectPrefix::new("bucket", "").as_relative_path("/hello")
+            RelativePath::new("hello").unwrap(),
+            ObjectPrefix::new("bucket", "")
+                .as_relative_path("/hello")
+                .unwrap()
         );
 
         assert_eq!(
-            RelativePath::new("hello"),
-            ObjectPrefix::new("bucket", "/prefix").as_relative_path("prefix/hello")
+            RelativePath::new("hello").unwrap(),
+            ObjectPrefix::new("bucket", "/prefix")
+                .as_relative_path("prefix/hello")
+                .unwrap()
         );
 
         assert_eq!(
-            RelativePath::new("hello"),
-            ObjectPrefix::new("bucket", "prefix").as_relative_path("prefix/hello")
+            RelativePath::new("hello").unwrap(),
+            ObjectPrefix::new("bucket", "prefix")
+                .as_relative_path("prefix/hello")
+                .unwrap()
         );
 
         assert_eq!(
-            RelativePath::new("world"),
-            ObjectPrefix::new("bucket", "prefix/hello").as_relative_path("prefix/hello/world")
+            RelativePath::new("world").unwrap(),
+            ObjectPrefix::new("bucket", "prefix/hello")
+                .as_relative_path("prefix/hello/world")
+                .unwrap()
         );
 
         assert_eq!(
-            RelativePath::new("hello/world"),
-            ObjectPrefix::new("bucket", "prefix/").as_relative_path("prefix/hello/world")
+            RelativePath::new("hello/world").unwrap(),
+            ObjectPrefix::new("bucket", "prefix/")
+                .as_relative_path("prefix/hello/world")
+                .unwrap()
         );
     }
 }

@@ -209,9 +209,13 @@ impl std::fmt::Debug for RelativePath {
 
 impl RelativePath {
     /// Invariant: a name should not start with a slash
-    pub fn new(path: &str) -> Self {
+    pub fn new(path: &str) -> RSyncResult<Self> {
         let path = path.strip_prefix('/').unwrap_or(path).to_owned();
-        Self { path }
+        if path.is_empty() {
+            Err(RSyncError::EmptyRelativePathError)
+        } else {
+            Ok(Self { path })
+        }
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -234,6 +238,7 @@ pub enum RSyncError {
     MissingFieldsInGcsResponse(String),
     StorageError(super::storage::Error),
     FsIoError(std::io::Error),
+    EmptyRelativePathError,
 }
 
 impl std::fmt::Display for RSyncError {
@@ -262,13 +267,25 @@ pub type RSyncResult<T> = Result<T, RSyncError>;
 
 #[cfg(test)]
 mod tests {
-    use crate::gcp::sync::RelativePath;
+    use crate::{gcp::sync::RelativePath, sync::RSyncError};
 
     #[test]
     fn test_relative_path() {
-        assert_eq!("", RelativePath::new("").path);
-        assert_eq!("", RelativePath::new("/").path);
-        assert_eq!("hello/world", RelativePath::new("/hello/world").path);
-        assert_eq!("hello/world", RelativePath::new("hello/world").path);
+        fn is_empty_err(x: RSyncError) -> bool {
+            matches!(x, RSyncError::EmptyRelativePathError)
+        }
+        assert!(
+            is_empty_err(RelativePath::new("").unwrap_err()),
+            "empty path is not allowed"
+        );
+        assert!(is_empty_err(RelativePath::new("/").unwrap_err()));
+        assert_eq!(
+            "hello/world",
+            RelativePath::new("/hello/world").unwrap().path
+        );
+        assert_eq!(
+            "hello/world",
+            RelativePath::new("hello/world").unwrap().path
+        );
     }
 }
