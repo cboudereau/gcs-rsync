@@ -20,7 +20,7 @@ async fn main() -> StorageResult<()> {
     let stream = FramedRead::new(file, BytesCodec::new());
 
     let name = format!("{}/{}", prefix, name);
-    let object = Object::new(bucket, name.as_str());
+    let object = Object::new(bucket, name.as_str())?;
     object_client.upload(&object, stream).await.unwrap();
     println!("object {} uploaded", &object);
     Ok(())

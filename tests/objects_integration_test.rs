@@ -146,7 +146,7 @@ async fn test_get_object_not_found() {
 async fn test_upload_with_detailed_error() {
     let test_config = GcsTestConfig::from_env().await;
     let object_client = ObjectClient::new(test_config.token()).await.unwrap();
-    let object = Object::new("the_bad_bucket", "name");
+    let object = Object::new("the_bad_bucket", "name").unwrap();
 
     let err = upload_bytes(&object_client, &object, "").await.unwrap_err();
 

@@ -20,7 +20,7 @@ async fn main() -> StorageResult<()> {
     let file_name = Path::new(&name).file_name().unwrap().to_string_lossy();
     let file_path = format!("{}/{}", output_path, file_name);
 
-    let object = Object::new(bucket, name);
+    let object = Object::new(bucket, name)?;
     let mut stream = object_client.download(&object).await.unwrap();
 
     let file = File::create(&file_path).await.unwrap();
