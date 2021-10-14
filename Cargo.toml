@@ -2,6 +2,8 @@
 name = "gcs-rsync"
 version = "0.1.0"
 edition = "2018"
+description = "rsync support for gcs with higher perf than gsutil rsync"
+license = "MIT"
 
 [dependencies]
 serde_json       = "1.0"
