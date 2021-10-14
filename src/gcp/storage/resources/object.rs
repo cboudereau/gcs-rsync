@@ -87,7 +87,7 @@ impl Object {
             return Err(Error::GcsInvalidObjectName);
         }
 
-        if name.is_empty() || name.starts_with(".") {
+        if name.is_empty() || name.starts_with('.') {
             return Err(Error::GcsInvalidObjectName);
         }
 
