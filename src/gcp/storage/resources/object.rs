@@ -78,6 +78,7 @@ impl Object {
         return format!("gs://{}/{}", &self.bucket, &self.name);
     }
 
+    /// References: https://cloud.google.com/storage/docs/naming-objects
     pub fn new(bucket: &str, name: &str) -> StorageResult<Self> {
         if bucket.is_empty() {
             return Err(Error::GcsInvalidObjectName);
