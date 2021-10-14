@@ -1,8 +1,12 @@
 # gcs-rsync
 
-Lightweight and efficient gcs rsync faster than [Google Cloud Storage rsync](https://cloud.google.com/storage/docs/gsutil/commands/rsync) for Rust.
+[![crates.io]](https://img.shields.io/crates/v/gcs-rsync.svg)
+[![build](https://github.com/cboudereau/gcs-rsync/workflows/build/badge.svg?branch=main)](https://github.com/cboudereau/gcs-rsync/workflows/build)
+[![docs.rs](https://docs.rs/gcs-rsync/badge.svg)](https://docs.rs/gcs-rsync)
 
-gcs-sync is faster than `gsutil rsync` when files change a lot while performance is similar to `gsutil` when there is no changes.
+Lightweight and efficient Rust gcs rsync for Google Cloud Storage.
+
+gcs-sync is faster than [gsutil rsync](https://cloud.google.com/storage/docs/gsutil/commands/rsync) when files change a lot while performance is similar to `gsutil` when there is no changes.
 
 ## Benchmark
 
