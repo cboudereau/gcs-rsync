@@ -1,6 +1,6 @@
 # gcs-rsync
 
-[![build](https://github.com/cboudereau/gcs-rsync/workflows/build/badge.svg?branch=main)](https://github.com/cboudereau/gcs-rsync/workflows/build)
+[![build](https://github.com/cboudereau/gcs-rsync/workflows/build/badge.svg?branch=main)](https://github.com/cboudereau/gcs-rsync/actions/workflows/build.yml)
 [![crates.io](https://img.shields.io/crates/v/gcs-rsync.svg)](https://crates.io/crates/gcs-rsync)
 [![docs.rs](https://docs.rs/gcs-rsync/badge.svg)](https://docs.rs/gcs-rsync)
 
