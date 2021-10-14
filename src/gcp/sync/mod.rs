@@ -2,7 +2,7 @@ mod fs;
 mod gcs;
 
 use std::ops::Not;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use bytes::Bytes;
 use futures::future::Either;
@@ -329,8 +329,26 @@ impl Entry {
 pub enum RSyncError {
     MissingFieldsInGcsResponse(String),
     StorageError(super::storage::Error),
-    FsIoError(std::io::Error),
+    FsIoError {
+        path: PathBuf,
+        message: String,
+        error: std::io::Error,
+    },
     EmptyRelativePathError,
+}
+
+impl RSyncError {
+    fn fs_io_error<T, U>(message: U, path: T, error: std::io::Error) -> RSyncError
+    where
+        T: AsRef<Path>,
+        U: AsRef<str>,
+    {
+        RSyncError::FsIoError {
+            path: path.as_ref().to_path_buf(),
+            message: message.as_ref().to_owned(),
+            error,
+        }
+    }
 }
 
 impl std::fmt::Display for RSyncError {

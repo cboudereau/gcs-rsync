@@ -156,12 +156,7 @@ where
 {
     tokio::fs::read_to_string(file_path.as_ref())
         .await
-        .map_err(|err| {
-            Error::io_error(
-                format!("error while reading file {:?}", file_path.as_ref()),
-                err,
-            )
-        })
+        .map_err(|err| Error::io_error("error while reading file", file_path.as_ref(), err))
         .and_then(|f| from_str(f.as_str()))
 }
 
