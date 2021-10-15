@@ -3,8 +3,9 @@
 [![build](https://github.com/cboudereau/gcs-rsync/workflows/build/badge.svg?branch=main&event=push)](https://github.com/cboudereau/gcs-rsync/actions/workflows/build.yml?query=event%3Apush)
 [![codecov](https://codecov.io/gh/cboudereau/gcs-rsync/branch/main/graph/badge.svg?token=AA168CFNFQ)](https://codecov.io/gh/cboudereau/gcs-rsync)
 [![License:MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![crates.io](https://img.shields.io/crates/v/gcs-rsync.svg)](https://crates.io/crates/gcs-rsync)
 [![docs.rs](https://docs.rs/gcs-rsync/badge.svg)](https://docs.rs/gcs-rsync)
+[![crates.io](https://img.shields.io/crates/v/gcs-rsync.svg)](https://crates.io/crates/gcs-rsync)
+[![crates.io (recent)](https://img.shields.io/crates/dr/gcs-rsync)](https://crates.io/crates/gcs-rsync)
 
 Lightweight and efficient Rust gcs rsync for Google Cloud Storage.
 
