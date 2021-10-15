@@ -27,7 +27,7 @@ struct Opt {
     dest: String,
 }
 
-async fn get_source(path: &str) -> RSyncResult<DefaultSource> {
+async fn get_source(path: &str, is_dest: bool) -> RSyncResult<DefaultSource> {
     match Object::from_str(path).ok() {
         Some(o) => {
             let token_generator = authorizeduser::default()
@@ -37,7 +37,7 @@ async fn get_source(path: &str) -> RSyncResult<DefaultSource> {
         }
         None => {
             let path = Path::new(path);
-            if path.exists() {
+            if path.exists() || is_dest {
                 Ok(DefaultSource::fs(path))
             } else {
                 Err(RSyncError::EmptyRelativePathError)
@@ -52,8 +52,8 @@ async fn main() -> RSyncResult<()> {
 
     let opt = Opt::from_args();
 
-    let source = get_source(&opt.source).await?;
-    let dest = get_source(&opt.dest).await?;
+    let source = get_source(&opt.source, false).await?;
+    let dest = get_source(&opt.dest, true).await?;
 
     let rsync = RSync::new(source, dest);
 
