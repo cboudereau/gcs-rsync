@@ -15,8 +15,8 @@ env:
 
   TEST_BUCKET: gcs-rsync-dev
   TEST_PREFIX: integration-test-ci
-  TEST_SERVICE_ACCOUNT: service_account.json
-  GOOGLE_APPLICATION_CREDENTIALS: default_token.json
+  TEST_SERVICE_ACCOUNT: ./service_account.json
+  GOOGLE_APPLICATION_CREDENTIALS: ./default_token.json
 
 jobs:
   lint: 
@@ -39,19 +39,23 @@ jobs:
 
 
   check:
+    name: code coverage
     env:
       GOOGLE_APPLICATION_CREDENTIALS_TOKEN: ${{ secrets.TEST_USELESS_DATA }} 
       TEST_SERVICE_ACCOUNT_TOKEN: ${{ secrets.TEST_SERVICE_ACCOUNT_TOKEN }} 
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
       - name: Setup test default token
         run: 'echo "$GOOGLE_APPLICATION_CREDENTIALS_TOKEN" > default_token.json'
 
       - name: Setup test service_account token
         run: 'echo "$TEST_SERVICE_ACCOUNT_TOKEN" > service_account.json'
 
-      - name: Checkout repository
-        uses: actions/checkout@v2
+      - name: Debug
+        run: 'ls -lh'
 
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
