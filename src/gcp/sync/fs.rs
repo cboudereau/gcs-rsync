@@ -86,7 +86,7 @@ impl FsClient {
     pub(super) async fn read(&self, path: &RelativePath) -> impl Stream<Item = RSyncResult<Bytes>> {
         let path = self.prefix.as_file_path(path);
         let file = fs::File::open(path.as_path()).await.unwrap();
-        FramedRead::new(file, BytesCodec::new())
+        FramedRead::with_capacity(file, BytesCodec::new(), crate::DEFAULT_BUF_SIZE)
             .map_err(move |err| RSyncError::fs_io_error("read failure", path.as_path(), err))
             .map_ok(|x| x.freeze())
     }
@@ -95,7 +95,8 @@ impl FsClient {
         let file_path = self.prefix.as_file_path(path);
 
         if let Ok(file) = fs::File::open(file_path.as_path()).await {
-            let mut frame = FramedRead::new(file, BytesCodec::new());
+            let mut frame =
+                FramedRead::with_capacity(file, BytesCodec::new(), crate::DEFAULT_BUF_SIZE);
 
             let mut crc32c: u32 = 0;
             while let Some(data) = frame
@@ -140,7 +141,7 @@ impl FsClient {
             .await
             .map_err(|e| RSyncError::fs_io_error("create file failed", file_path.as_path(), e))?;
 
-        let mut buf_writer = BufWriter::new(file);
+        let mut buf_writer = BufWriter::with_capacity(crate::DEFAULT_BUF_SIZE, file);
 
         while let Some(data) = stream.try_next().await? {
             buf_writer.write_all(&data).await.map_err(|e| {
