@@ -39,7 +39,6 @@ jobs:
 
 
   check:
-    name: Rust project
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -55,7 +54,7 @@ jobs:
         uses: actions-rs/tarpaulin@v0.1
         with:
           version: '0.15.0'
-          args: '-- --test-threads 1 --lib'
+          args: '-- --test-threads 1'
 
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v1.0.2
