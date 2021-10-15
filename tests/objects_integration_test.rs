@@ -228,7 +228,7 @@ fn assert_unexpected_response(err: gcs_rsync::storage::Error, content: &str) {
     match err {
         gcs_rsync::storage::Error::GcsUnexpectedResponse { value: actual, .. } => {
             assert!(
-                actual.to_string().contains(content),
+                actual.contains(content),
                 "{:?} not found in json {}",
                 content,
                 actual
