@@ -10,13 +10,13 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
-  EXAMPLE_BUCKET: ${{ secrets.EXAMPLE_BUCKET }}
-  EXAMPLE_PREFIX: ${{ secrets.EXAMPLE_PREFIX }}
+  EXAMPLE_BUCKET: gcs-rsync-dev
+  EXAMPLE_PREFIX: example-ci
 
-  TEST_BUCKET: ${{ secrets.TEST_BUCKET }}
-  TEST_PREFIX: ${{ secrets.TEST_PREFIX }}
-  TEST_SERVICE_ACCOUNT: ${{ secrets.TEST_SERVICE_ACCOUNT }}
-  GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
+  TEST_BUCKET: gcs-rsync-dev
+  TEST_PREFIX: integration-test-ci
+  TEST_SERVICE_ACCOUNT: service_account.json
+  GOOGLE_APPLICATION_CREDENTIALS: default_token.json
 
 jobs:
   lint: 
@@ -39,8 +39,17 @@ jobs:
 
 
   check:
+    env:
+      GOOGLE_APPLICATION_CREDENTIALS_TOKEN: ${{ secrets.TEST_USELESS_DATA }} 
+      TEST_SERVICE_ACCOUNT_TOKEN: ${{ secrets.TEST_SERVICE_ACCOUNT_TOKEN }} 
     runs-on: ubuntu-latest
     steps:
+      - name: Setup test default token
+        run: 'echo "$GOOGLE_APPLICATION_CREDENTIALS_TOKEN" > default_token.json'
+
+      - name: Setup test service_account token
+        run: 'echo "$TEST_SERVICE_ACCOUNT_TOKEN" > service_account.json'
+
       - name: Checkout repository
         uses: actions/checkout@v2
 
