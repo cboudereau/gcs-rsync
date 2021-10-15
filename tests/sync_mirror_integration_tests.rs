@@ -165,6 +165,16 @@ async fn test_fs_to_gcs_sync_and_mirror() {
     }
     .await;
 
+    let gcs_source_replica2 = async {
+        let token_generator = authorizeduser::default().await.unwrap();
+        let bucket = gcs_dst_t.bucket();
+        let prefix = gcs_dst_t.prefix();
+        ReaderWriter::gcs(token_generator, bucket.as_str(), prefix.to_str().unwrap())
+            .await
+            .unwrap()
+    }
+    .await;
+
     let gcs_dest_replica = generate_gcs(GcsTestConfig::from_env().await).await;
 
     let gcs_dest = generate_gcs(gcs_dst_t).await;
@@ -175,9 +185,13 @@ async fn test_fs_to_gcs_sync_and_mirror() {
     let fs_replica_t = FsTestConfig::new();
     let fs_dest_replica = DefaultSource::fs(fs_replica_t.base_path.as_path());
 
+    let fs_replica_t2 = FsTestConfig::new();
+    let fs_dest_replica2 = DefaultSource::fs(fs_replica_t2.base_path.as_path());
+
     let rsync_fs_to_gcs = RSync::new(fs_source, gcs_dest);
     let rsync_gcs_to_gcs_replica = RSync::new(gcs_source_replica, gcs_dest_replica);
     let rsync_fs_to_fs_replica = RSync::new(fs_source_replica, fs_dest_replica);
+    let rsync_gs_to_fs_replica = RSync::new(gcs_source_replica2, fs_dest_replica2);
 
     let expected = vec![
         created("a/long/path/hello_world.toml"),
@@ -187,6 +201,7 @@ async fn test_fs_to_gcs_sync_and_mirror() {
     assert_eq!(expected, sync(&rsync_fs_to_gcs).await);
     assert_eq!(expected, sync(&rsync_gcs_to_gcs_replica).await);
     assert_eq!(expected, sync(&rsync_fs_to_fs_replica).await);
+    assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
 
     let expected = vec![
         already_sinced("a/long/path/hello_world.toml"),
@@ -196,6 +211,7 @@ async fn test_fs_to_gcs_sync_and_mirror() {
     assert_eq!(expected, sync(&rsync_fs_to_gcs).await);
     assert_eq!(expected, sync(&rsync_gcs_to_gcs_replica).await);
     assert_eq!(expected, sync(&rsync_fs_to_fs_replica).await);
+    assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
 
     write_to_file(src_t.file_path("test.json").as_path(), "updated").await;
     let new_file = src_t.file_path("new.json");
@@ -209,6 +225,7 @@ async fn test_fs_to_gcs_sync_and_mirror() {
     assert_eq!(expected, sync(&rsync_fs_to_gcs).await);
     assert_eq!(expected, sync(&rsync_gcs_to_gcs_replica).await);
     assert_eq!(expected, sync(&rsync_fs_to_fs_replica).await);
+    assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
 
     delete_files(&file_names[..]).await;
     let expected = vec![
@@ -221,10 +238,12 @@ async fn test_fs_to_gcs_sync_and_mirror() {
     assert_eq!(expected, mirror(&rsync_fs_to_gcs).await);
     assert_eq!(expected, mirror(&rsync_gcs_to_gcs_replica).await);
     assert_eq!(expected, mirror(&rsync_fs_to_fs_replica).await);
+    assert_eq!(expected, mirror(&rsync_gs_to_fs_replica).await);
 
     delete_file(new_file.as_path()).await;
     let expected = vec![deleted("new.json")];
     assert_eq!(expected, mirror(&rsync_fs_to_gcs).await);
     assert_eq!(expected, mirror(&rsync_gcs_to_gcs_replica).await);
     assert_eq!(expected, mirror(&rsync_fs_to_fs_replica).await);
+    assert_eq!(expected, mirror(&rsync_gs_to_fs_replica).await);
 }
