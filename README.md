@@ -13,7 +13,10 @@ gcs-sync is faster than [gsutil rsync](https://cloud.google.com/storage/docs/gsu
 ## How to install
 
 ```bash
-cargo install --example rsync
+cargo install --example gcs-rsync gcs-rsync
+
+~/.cargo/bin/gcs-rsync
+
 ```
 
 ## Benchmark
