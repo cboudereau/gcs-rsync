@@ -1,8 +1,11 @@
 use std::path::{Path, PathBuf};
 
 use futures::{StreamExt, TryStreamExt};
-use gcs_rsync::sync::{
-    DefaultRSync, DefaultSource, RMirrorStatus, RSync, RSyncStatus, RelativePath,
+use gcs_rsync::{
+    storage::credentials::authorizeduser,
+    sync::{
+        DefaultRSync, DefaultSource, RMirrorStatus, RSync, RSyncStatus, ReaderWriter, RelativePath,
+    },
 };
 use tokio::io::AsyncWriteExt;
 
@@ -136,73 +139,111 @@ async fn test_fs_to_gcs_sync_and_mirror() {
 
     setup_files(&file_names[..], "Hello World").await;
 
-    let dst_t = GcsTestConfig::from_env().await;
+    async fn generate_gcs(test_config: GcsTestConfig) -> DefaultSource {
+        let bucket = test_config.bucket();
+        let prefix = test_config.prefix();
 
-    let dst_bucket = dst_t.bucket();
-    let dst_prefix = dst_t.prefix();
-    let source = DefaultSource::fs(src_t.base_path.as_path());
-    let dest = DefaultSource::gcs(
-        dst_t.token(),
-        dst_bucket.as_str(),
-        dst_prefix.to_str().unwrap(),
-    )
-    .await
-    .unwrap();
-    let rsync = RSync::new(source, dest);
+        let gcs_dest = DefaultSource::gcs(
+            test_config.token(),
+            bucket.as_str(),
+            prefix.to_str().unwrap(),
+        )
+        .await
+        .unwrap();
 
-    let actual = sync(&rsync).await;
+        gcs_dest
+    }
+    let gcs_dst_t = GcsTestConfig::from_env().await;
 
-    assert_eq!(
-        vec![
-            created("a/long/path/hello_world.toml"),
-            created("hello/world/test.txt"),
-            created("test.json"),
-        ],
-        actual
-    );
+    let gcs_source_replica = async {
+        let token_generator = authorizeduser::default().await.unwrap();
+        let bucket = gcs_dst_t.bucket();
+        let prefix = gcs_dst_t.prefix();
+        ReaderWriter::gcs(token_generator, bucket.as_str(), prefix.to_str().unwrap())
+            .await
+            .unwrap()
+    }
+    .await;
 
-    let actual = sync(&rsync).await;
+    let gcs_source_replica2 = async {
+        let token_generator = authorizeduser::default().await.unwrap();
+        let bucket = gcs_dst_t.bucket();
+        let prefix = gcs_dst_t.prefix();
+        ReaderWriter::gcs(token_generator, bucket.as_str(), prefix.to_str().unwrap())
+            .await
+            .unwrap()
+    }
+    .await;
 
-    assert_eq!(
-        vec![
-            already_sinced("a/long/path/hello_world.toml"),
-            already_sinced("hello/world/test.txt"),
-            already_sinced("test.json"),
-        ],
-        actual
-    );
+    let gcs_dest_replica = generate_gcs(GcsTestConfig::from_env().await).await;
 
+    let gcs_dest = generate_gcs(gcs_dst_t).await;
+
+    let fs_source = DefaultSource::fs(src_t.base_path.as_path());
+    let fs_source_replica = DefaultSource::fs(src_t.base_path.as_path());
+
+    let fs_replica_t = FsTestConfig::new();
+    let fs_dest_replica = DefaultSource::fs(fs_replica_t.base_path.as_path());
+
+    let fs_replica_t2 = FsTestConfig::new();
+    let fs_dest_replica2 = DefaultSource::fs(fs_replica_t2.base_path.as_path());
+
+    let rsync_fs_to_gcs = RSync::new(fs_source, gcs_dest);
+    let rsync_gcs_to_gcs_replica = RSync::new(gcs_source_replica, gcs_dest_replica);
+    let rsync_fs_to_fs_replica = RSync::new(fs_source_replica, fs_dest_replica);
+    let rsync_gs_to_fs_replica = RSync::new(gcs_source_replica2, fs_dest_replica2);
+
+    let expected = vec![
+        created("a/long/path/hello_world.toml"),
+        created("hello/world/test.txt"),
+        created("test.json"),
+    ];
+    assert_eq!(expected, sync(&rsync_fs_to_gcs).await);
+    assert_eq!(expected, sync(&rsync_gcs_to_gcs_replica).await);
+    assert_eq!(expected, sync(&rsync_fs_to_fs_replica).await);
+    assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
+
+    let expected = vec![
+        already_sinced("a/long/path/hello_world.toml"),
+        already_sinced("hello/world/test.txt"),
+        already_sinced("test.json"),
+    ];
+    assert_eq!(expected, sync(&rsync_fs_to_gcs).await);
+    assert_eq!(expected, sync(&rsync_gcs_to_gcs_replica).await);
+    assert_eq!(expected, sync(&rsync_fs_to_fs_replica).await);
+    assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
+
+    write_to_file(src_t.file_path("test.json").as_path(), "updated").await;
     let new_file = src_t.file_path("new.json");
-    write_to_file(src_t.file_path("test.json").as_path(), "top new content").await;
-    write_to_file(new_file.as_path(), "top new content").await;
-    let actual = sync(&rsync).await;
-
-    assert_eq!(
-        vec![
-            created("new.json"),
-            updated("test.json"),
-            already_sinced("a/long/path/hello_world.toml"),
-            already_sinced("hello/world/test.txt"),
-        ],
-        actual
-    );
+    write_to_file(new_file.as_path(), "new file").await;
+    let expected = vec![
+        created("new.json"),
+        updated("test.json"),
+        already_sinced("a/long/path/hello_world.toml"),
+        already_sinced("hello/world/test.txt"),
+    ];
+    assert_eq!(expected, sync(&rsync_fs_to_gcs).await);
+    assert_eq!(expected, sync(&rsync_gcs_to_gcs_replica).await);
+    assert_eq!(expected, sync(&rsync_fs_to_fs_replica).await);
+    assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
 
     delete_files(&file_names[..]).await;
+    let expected = vec![
+        synced(already_sinced("new.json")),
+        deleted("a/long/path/hello_world.toml"),
+        deleted("hello/world/test.txt"),
+        deleted("test.json"),
+        not_deleted("new.json"),
+    ];
+    assert_eq!(expected, mirror(&rsync_fs_to_gcs).await);
+    assert_eq!(expected, mirror(&rsync_gcs_to_gcs_replica).await);
+    assert_eq!(expected, mirror(&rsync_fs_to_fs_replica).await);
+    assert_eq!(expected, mirror(&rsync_gs_to_fs_replica).await);
 
-    let actual = mirror(&rsync).await;
-
-    assert_eq!(
-        vec![
-            synced(already_sinced("new.json")),
-            deleted("a/long/path/hello_world.toml"),
-            deleted("hello/world/test.txt"),
-            deleted("test.json"),
-            not_deleted("new.json")
-        ],
-        actual
-    );
     delete_file(new_file.as_path()).await;
-
-    let actual = mirror(&rsync).await;
-    assert_eq!(vec![deleted("new.json"),], actual);
+    let expected = vec![deleted("new.json")];
+    assert_eq!(expected, mirror(&rsync_fs_to_gcs).await);
+    assert_eq!(expected, mirror(&rsync_gcs_to_gcs_replica).await);
+    assert_eq!(expected, mirror(&rsync_fs_to_fs_replica).await);
+    assert_eq!(expected, mirror(&rsync_gs_to_fs_replica).await);
 }

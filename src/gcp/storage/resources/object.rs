@@ -32,6 +32,7 @@ pub struct ObjectsListRequest {
 pub struct Objects {
     pub kind: Option<String>,
 
+    #[serde(default = "Vec::new")]
     pub items: Vec<PartialObject>,
 
     #[serde(default = "Vec::new")]
