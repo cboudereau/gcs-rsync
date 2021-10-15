@@ -5,8 +5,6 @@
 [![crates.io](https://img.shields.io/crates/v/gcs-rsync.svg)](https://crates.io/crates/gcs-rsync)
 [![docs.rs](https://docs.rs/gcs-rsync/badge.svg)](https://docs.rs/gcs-rsync)
 
-
-
 Lightweight and efficient Rust gcs rsync for Google Cloud Storage.
 
 gcs-sync is faster than [gsutil rsync](https://cloud.google.com/storage/docs/gsutil/commands/rsync) when files change a lot while performance is similar to `gsutil` when there is no changes.

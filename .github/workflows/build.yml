@@ -10,12 +10,13 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
-  EXAMPLE_BUCKET: ${{ secrets.EXAMPLE_BUCKET }}
-  EXAMPLE_PREFIX: ${{ secrets.EXAMPLE_PREFIX }}
+  EXAMPLE_BUCKET: gcs-rsync-dev
+  EXAMPLE_PREFIX: example-ci
 
-  TEST_BUCKET: ${{ secrets.TEST_BUCKET }}
-  TEST_PREFIX: ${{ secrets.TEST_PREFIX }}
-  TEST_SERVICE_ACCOUNT: ${{ secrets.TEST_SERVICE_ACCOUNT }}
+  TEST_BUCKET: gcs-rsync-dev
+  TEST_PREFIX: integration-test-ci
+  TEST_SERVICE_ACCOUNT: service_account.json
+  GOOGLE_APPLICATION_CREDENTIALS: default_token.json
 
 jobs:
   lint: 
@@ -35,3 +36,44 @@ jobs:
         run: cargo build --verbose
       - name: unit tests
         run: cargo test --lib --verbose
+
+  check:
+    name: code coverage (unit + integration tests)
+    env:
+      GOOGLE_APPLICATION_CREDENTIALS_TOKEN: ${{ secrets.TEST_USELESS_DATA_TOKEN }} 
+      TEST_SERVICE_ACCOUNT_TOKEN: ${{ secrets.TEST_SERVICE_ACCOUNT_TOKEN }} 
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+
+      - name: Setup test default token
+        run: 'echo "$GOOGLE_APPLICATION_CREDENTIALS_TOKEN" > default_token.json'
+
+      - name: Setup test service_account token
+        run: 'echo "$TEST_SERVICE_ACCOUNT_TOKEN" > service_account.json'
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Run cargo-tarpaulin
+        uses: actions-rs/tarpaulin@v0.1
+        with:
+          version: '0.15.0'
+          args: '-- --test-threads 1'
+
+      - name: Upload to codecov.io
+        uses: codecov/codecov-action@v1.0.2
+        with:
+          token: ${{secrets.CODECOV_TOKEN}}
+
+      - name: Archive code coverage results
+        uses: actions/upload-artifact@v1
+        with:
+          name: code-coverage-report
+          path: cobertura.xml
