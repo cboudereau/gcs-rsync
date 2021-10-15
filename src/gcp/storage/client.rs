@@ -59,8 +59,8 @@ impl<T: TokenGenerator> StorageClient<T> {
             });
         }
 
-        let err = response.json().await.map_err(super::Error::GcsHttpError)?;
-        Err(super::Error::GcsUnexpectedResponse(err))
+        let err = response.text().await.map_err(super::Error::GcsHttpError)?;
+        Err(super::Error::gcs_unexpected_response_error(url, err))
     }
 
     pub async fn delete(&self, url: &str) -> StorageResult<()> {
@@ -139,6 +139,7 @@ impl<T: TokenGenerator> StorageClient<T> {
             .json()
             .await
             .map_err(super::Error::GcsHttpError)?;
-        r.into_result().map_err(super::Error::GcsUnexpectedResponse)
+        r.into_result()
+            .map_err(|err| super::Error::gcs_unexpected_json::<R>(url, err))
     }
 }

@@ -73,11 +73,46 @@ pub mod credentials {
 pub enum Error {
     GcsTokenError(super::oauth2::Error),
     GcsHttpError(reqwest::Error),
-    GcsUnexpectedResponse(serde_json::Value),
+    GcsUnexpectedResponse {
+        url: String,
+        value: String,
+    },
+    GcsUnexpectedJson {
+        url: String,
+        expected_type: String,
+        json: serde_json::Value,
+    },
     GcsPartialResponseError(String),
-    GcsInvalidUrl { url: String, message: String },
+    GcsInvalidUrl {
+        url: String,
+        message: String,
+    },
     GcsInvalidObjectName,
-    GcsResourceNotFound { url: String },
+    GcsResourceNotFound {
+        url: String,
+    },
+}
+
+impl Error {
+    fn gcs_unexpected_response_error<T, U>(url: T, value: U) -> Self
+    where
+        T: AsRef<str>,
+        U: AsRef<str>,
+    {
+        Self::GcsUnexpectedResponse {
+            url: url.as_ref().to_owned(),
+            value: value.as_ref().to_owned(),
+        }
+    }
+
+    fn gcs_unexpected_json<T>(url: &str, json: serde_json::Value) -> Self {
+        let expected_type = std::any::type_name::<T>().to_owned();
+        Self::GcsUnexpectedJson {
+            url: url.to_owned(),
+            expected_type,
+            json,
+        }
+    }
 }
 
 pub type StorageResult<T> = std::result::Result<T, Error>;
