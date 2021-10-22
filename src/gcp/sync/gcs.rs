@@ -1,4 +1,4 @@
-use crate::storage::Error as StorageError;
+use crate::storage::{Error as StorageError, Metadata, ObjectMetadata};
 use bytes::Bytes;
 use futures::{Stream, StreamExt, TryStreamExt};
 
@@ -155,6 +155,20 @@ where
         }
     }
 
+    pub(super) async fn size_and_mt(&self, path: &RelativePath) -> RSyncResult<bool> {
+        let o = &self.object_prefix.as_object(path)?;
+        let entry = self
+            .client
+            .get(o, "size,metadata/goog-reserved-file-mtime")
+            .await
+            .map_err(RSyncError::StorageError);
+        match entry {
+            Ok(_) => Ok(true),
+            Err(RSyncError::StorageError(StorageError::GcsResourceNotFound { .. })) => Ok(false),
+            Err(err) => Err(err),
+        }
+    }
+
     pub(super) async fn delete(&self, path: &RelativePath) -> RSyncResult<()> {
         let o = self.object_prefix.as_object(path)?;
         let delete_result = self.client.delete(&o).await;
@@ -172,6 +186,34 @@ where
         let o = &self.object_prefix.as_object(path)?;
         self.client
             .upload(o, stream)
+            .await
+            .map_err(RSyncError::StorageError)
+            .map(|_| ())
+    }
+
+    pub(super) async fn write_multipart<S>(
+        &self,
+        mtime: chrono::DateTime<chrono::Utc>,
+        path: &RelativePath,
+        stream: S,
+        size: u32,
+    ) -> RSyncResult<()>
+    where
+        S: futures::Stream<Item = Result<bytes::Bytes, crate::storage::Error>>
+            + Send
+            + Sync
+            + 'static,
+    {
+        let o = &self.object_prefix.as_object(path)?;
+        let m = ObjectMetadata {
+            metadata: {
+                Metadata {
+                    modification_time: Some(mtime),
+                }
+            },
+        };
+        self.client
+            .upload_metadata(&m, o, stream, size)
             .await
             .map_err(RSyncError::StorageError)
             .map(|_| ())

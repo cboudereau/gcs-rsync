@@ -267,3 +267,14 @@ LDFLAGS="-static -L/usr/local/musl/lib" LD_LIBRARY_PATH=/usr/local/musl/lib:$LD_
 - [x] Doc crate
 - [x] CI/CD
 - [x] Publish crate
+- [ ] https://cloud.google.com/storage/docs/gsutil/commands/rsync#change-detection-algorithm
+- [ ] https://cloud.google.com/storage/docs/composing-objects
+- [ ] https://cloud.google.com/storage/docs/uploading-objects
+- [ ] https://cloud.google.com/storage/docs/xml-api/reference-headers#xgoogmeta
+- [ ] https://cloud.google.com/storage/docs/uploading-objects
+
+curl -X POST --data-binary /Users/clementboudereau/Downloads/hello.txt \
+ -H "Authorization: Bearer `gcloud auth print-access-token`" \
+ -H "Content-Type: multipart/related; boundary=BOUNDARY_STRING" \
+ -H "Content-Length: 10" \
+ "https://storage.googleapis.com/upload/storage/v1/b/gcs-rsync-dev/o?uploadType=multipart"

@@ -26,6 +26,19 @@ pub struct ObjectsListRequest {
     pub versions: Option<bool>,
 }
 
+#[derive(Debug, PartialEq, serde::Serialize, Default, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ObjectMetadata {
+    pub metadata: Metadata,
+}
+
+#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, Default, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Metadata {
+    #[serde(rename = "goog-reserved-file-mtime")] //compat with gsutil rsync
+    pub modification_time: Option<chrono::DateTime<chrono::Utc>>,
+}
+
 /// ObjectList response
 #[derive(Debug, serde::Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -107,11 +120,12 @@ impl Object {
         )
     }
 
-    pub fn upload_url(&self) -> String {
+    pub fn upload_url(&self, upload_type: &str) -> String {
         format!(
-            "{}/b/{}/o?uploadType=media&name={}",
+            "{}/b/{}/o?uploadType={}&name={}",
             UPLOAD_BASE_URL,
             percent_encode(&self.bucket),
+            upload_type,
             percent_encode(&self.name)
         )
     }
@@ -172,7 +186,7 @@ pub struct PartialObject {
     pub content_disposition: Option<String>,
     pub content_language: Option<String>,
     pub cache_control: Option<String>,
-    pub metadata: Option<std::collections::HashMap<String, String>>,
+    pub metadata: Option<Metadata>,
     #[serde(default, deserialize_with = "from_string_option")]
     pub crc32c: Option<CRC32C>,
     pub etag: Option<String>,
@@ -290,7 +304,7 @@ mod tests {
         let o = Object::new("hello/hello", "world/world").unwrap();
         assert_eq!(
             "https://storage.googleapis.com/upload/storage/v1/b/hello%2Fhello/o?uploadType=media&name=world%2Fworld",
-            o.upload_url()
+            o.upload_url("media")
         );
     }
 

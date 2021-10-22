@@ -2,7 +2,6 @@ pub mod oauth2;
 pub mod storage;
 pub mod sync;
 
-#[derive(Debug)]
 pub struct Client {
     pub(self) client: reqwest::Client,
 }
