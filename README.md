@@ -9,7 +9,7 @@
 
 Lightweight and efficient Rust gcs rsync for Google Cloud Storage.
 
-gcs-sync is faster than [gsutil rsync](https://cloud.google.com/storage/docs/gsutil/commands/rsync) when files change a lot while performance is similar to `gsutil` when there is no changes.
+gcs-rsync is faster than [gsutil rsync](https://cloud.google.com/storage/docs/gsutil/commands/rsync) according to the following benchmarks.
 
 ## How to install
 
@@ -22,7 +22,7 @@ cargo install --example gcs-rsync gcs-rsync
 
 ## Benchmark
 
-Important note about gsutil: The `gsutils ls` command does not list all object items by default but instead list all prefixes while adding the `-r` flag slowdown `gsutil` performance. The `ls` performance command is very different to the `rsync` implementation.
+Important note about gsutil: The `gsutil ls` command does not list all object items by default but instead list all prefixes while adding the `-r` flag slowdown `gsutil` performance. The `ls` performance command is very different to the `rsync` implementation.
 
 ### new files only (first time sync)
 
@@ -251,30 +251,3 @@ apk add --no-cache musl-dev pkgconfig openssl-dev
 
 LDFLAGS="-static -L/usr/local/musl/lib" LD_LIBRARY_PATH=/usr/local/musl/lib:$LD_LIBRARY_PATH CFLAGS="-I/usr/local/musl/include" PKG_CONFIG_PATH=/usr/local/musl/lib/pkgconfig cargo build --release --target=x86_64-unknown-linux-musl --example bucket_to_folder_sync
 ```
-
-## TODO
-
-- [x] OAuth2 service account (default, from and from_file)
-- [x] OAuth2 dev (default, from and from_file)
-- [x] OAuth2 Integration tests + examples
-- [x] Useful diagnostic on error (raw json response)
-- [x] List objects with better performance than gsutil by supporting [GCS Partial Response](https://cloud.google.com/storage/docs/json_api#partial-response)
-- [x] Upload/Download/Get/Delete objects + Integrations tests and examples
-- [x] Sync local folder (one way sync without delete remote files with crc32c support)
-- [x] Mirror local folder (sync + delete remotes files)
-- [x] Benchmarks
-- [x] Sync/Mirror integration tests
-- [x] Doc crate
-- [x] CI/CD
-- [x] Publish crate
-- [ ] https://cloud.google.com/storage/docs/gsutil/commands/rsync#change-detection-algorithm
-- [ ] https://cloud.google.com/storage/docs/composing-objects
-- [ ] https://cloud.google.com/storage/docs/uploading-objects
-- [ ] https://cloud.google.com/storage/docs/xml-api/reference-headers#xgoogmeta
-- [ ] https://cloud.google.com/storage/docs/uploading-objects
-
-curl -X POST --data-binary /Users/clementboudereau/Downloads/hello.txt \
- -H "Authorization: Bearer `gcloud auth print-access-token`" \
- -H "Content-Type: multipart/related; boundary=BOUNDARY_STRING" \
- -H "Content-Length: 10" \
- "https://storage.googleapis.com/upload/storage/v1/b/gcs-rsync-dev/o?uploadType=multipart"
