@@ -118,7 +118,7 @@ impl<T: TokenGenerator> StorageClient<T> {
     // }
     //
     // --gcs-storage
-    // Content-Type: image/jpeg
+    // Content-Type: application/octet-stream
     //
     // <ObjectStream>
     // --gcs-storage--
