@@ -26,12 +26,12 @@ Important note about gsutil: The `gsutil ls` command does not list all object it
 
 ### new files only (first time sync)
 
-- gcs-sync: 2.2s/7MB
+- gcs-rsync: 2.2s/7MB
 - gsutil: 9.93s/47MB
 
-**winner**: gcs-sync
+**winner**: gcs-rsync
 
-#### gcs-sync sync bench
+#### gcs-rsync sync bench
 
 ```bash
 rm -rf ~/Documents/test4 && cargo build --release --examples && /usr/bin/time -lp -- ./target/release/examples/bucket_to_folder_sync
@@ -92,12 +92,12 @@ sys          2.35
 
 ### no change (second time sync)
 
-- gcs-sync: 1.79s/8MB
+- gcs-rsync: 0.78s/8MB
 - gsutil: 2.18s/47MB
 
-**winner**: no clear winner, but at least gcs-sync perf is similar to `gsutil rync` when there is no modification (which is quite rare).
+**winner**: gcs-rsync (due to size and mtime check before crc32c like gsutil does)
 
-#### gcs-sync sync bench
+#### gcs-rsync sync bench
 
 ```bash
 cargo build --release --examples && /usr/bin/time -lp -- ./target/release/examples/bucket_to_folder_sync
