@@ -3,7 +3,6 @@ mod gcs;
 
 use std::ops::Not;
 use std::path::{Path, PathBuf};
-use std::time::SystemTimeError;
 
 use bytes::Bytes;
 use futures::future::Either;
@@ -379,7 +378,6 @@ impl Entry {
 
 #[derive(Debug)]
 pub enum RSyncError {
-    FsBadModificationTime(SystemTimeError),
     MissingFieldsInGcsResponse(String),
     StorageError(super::storage::Error),
     FsIoError {
