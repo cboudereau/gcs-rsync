@@ -159,7 +159,7 @@ async fn test_get_object_ok() {
 }
 
 #[tokio::test]
-async fn test_get_object_size_mtime() {
+async fn test_get_object_size() {
     let test_config = GcsTestConfig::from_env().await;
     let object = test_config.object("object.txt");
     let object_client = ObjectClient::new(test_config.token()).await.unwrap();
@@ -168,10 +168,7 @@ async fn test_get_object_size_mtime() {
     assert_delete_err(&object_client, &object).await;
     assert_upload_bytes(&object_client, &object, content).await;
 
-    let partial_object = object_client
-        .get(&object, "size,metadata/goog-reserved-file-mtime")
-        .await
-        .unwrap();
+    let partial_object = object_client.get(&object, "size").await.unwrap();
 
     assert_eq!(5, partial_object.size.unwrap());
     assert_delete_ok(&object_client, &object).await;
