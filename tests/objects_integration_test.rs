@@ -108,14 +108,14 @@ async fn test_upload_multipart() {
 
     let data = bytes::Bytes::copy_from_slice(content);
     let stream = futures::stream::once(futures::future::ok::<bytes::Bytes, String>(data));
-    let now = chrono::offset::Utc::now();
+    let now = chrono::offset::Utc::now().timestamp();
     let metadata = ObjectMetadata {
         metadata: Metadata {
             modification_time: Some(now),
         },
     };
     object_client
-        .upload_metadata(&metadata, &object, stream, content.len() as u32)
+        .upload_with_metadata(&metadata, &object, stream)
         .await
         .unwrap();
     let actual = object_client

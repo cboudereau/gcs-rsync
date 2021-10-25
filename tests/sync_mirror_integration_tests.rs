@@ -125,7 +125,16 @@ fn synced(x: RSyncStatus) -> RMirrorStatus {
 }
 
 #[tokio::test]
+async fn test_fs_to_gcs_sync_and_mirror_with_restore_fs_mtime() {
+    test_fs_to_gcs_sync_and_mirror_base(true).await;
+}
+
+#[tokio::test]
 async fn test_fs_to_gcs_sync_and_mirror() {
+    test_fs_to_gcs_sync_and_mirror_base(false).await;
+}
+
+async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
     let src_t = FsTestConfig::new();
 
     let file_names = vec![
@@ -188,10 +197,13 @@ async fn test_fs_to_gcs_sync_and_mirror() {
     let fs_replica_t2 = FsTestConfig::new();
     let fs_dest_replica2 = DefaultSource::fs(fs_replica_t2.base_path.as_path());
 
-    let rsync_fs_to_gcs = RSync::new(fs_source, gcs_dest);
-    let rsync_gcs_to_gcs_replica = RSync::new(gcs_source_replica, gcs_dest_replica);
-    let rsync_fs_to_fs_replica = RSync::new(fs_source_replica, fs_dest_replica);
-    let rsync_gs_to_fs_replica = RSync::new(gcs_source_replica2, fs_dest_replica2);
+    let rsync_fs_to_gcs = RSync::new(fs_source, gcs_dest).with_set_fs_mtime(set_fs_mtime);
+    let rsync_gcs_to_gcs_replica =
+        RSync::new(gcs_source_replica, gcs_dest_replica).with_set_fs_mtime(set_fs_mtime);
+    let rsync_fs_to_fs_replica =
+        RSync::new(fs_source_replica, fs_dest_replica).with_set_fs_mtime(set_fs_mtime);
+    let rsync_gs_to_fs_replica =
+        RSync::new(gcs_source_replica2, fs_dest_replica2).with_set_fs_mtime(set_fs_mtime);
 
     let expected = vec![
         created("a/long/path/hello_world.toml"),

@@ -4,7 +4,10 @@ use crate::gcp::{
     Client,
 };
 use bytes::BufMut;
-use futures::{stream, Stream, StreamExt, TryStream, TryStreamExt};
+use futures::{
+    stream,
+    stream::{Stream, StreamExt, TryStream, TryStreamExt},
+};
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::RwLock;
 
@@ -111,7 +114,7 @@ impl<T: TokenGenerator> StorageClient<T> {
     // Content-Type: application/json; charset=UTF-8
     //
     // {
-    // "name": "myObject"
+    // "test": "hello"
     // }
     //
     // --gcs-storage
@@ -119,17 +122,11 @@ impl<T: TokenGenerator> StorageClient<T> {
     //
     // <ObjectStream>
     // --gcs-storage--
-    pub async fn post_multipart<S, M, E>(
-        &self,
-        url: &str,
-        metadata: &M,
-        body: S,
-        size: u32,
-    ) -> StorageResult<()>
+    pub async fn post_multipart<S, M>(&self, url: &str, metadata: &M, body: S) -> StorageResult<()>
     where
         M: Serialize,
-        S: futures::stream::Stream<Item = Result<bytes::Bytes, E>> + Send + Sync + 'static,
-        E: Into<Box<dyn std::error::Error + Send + Sync>> + 'static,
+        S: TryStream<Ok = bytes::Bytes> + Send + Sync + 'static,
+        S::Error: Into<Box<dyn std::error::Error + Send + Sync>> + Send + Sync,
     {
         let json = serde_json::ser::to_vec(metadata).map_err(Error::gcs_invalid_metadata::<M>)?;
 
@@ -150,23 +147,22 @@ impl<T: TokenGenerator> StorageClient<T> {
 
             part.freeze()
         };
-
         let mbody = {
-            let r = stream::iter([part])
-                .map(Ok)
-                .chain(body)
-                .chain(stream::iter([bytes::Bytes::from_static(MT_END_SEPARATOR)]).map(Ok));
-            r
+            stream::iter([Ok(part)])
+                .chain(body.into_stream())
+                .chain(stream::iter([Ok(bytes::Bytes::from_static(
+                    MT_END_SEPARATOR,
+                ))]))
         };
 
-        let total_len = part_len as u64 + size as u64 + MT_END_SEPARATOR.len() as u64;
+        // let total_len = part_len as u64 + size + MT_END_SEPARATOR.len() as u64;
         let response = self
             .client
             .client
             .post(url)
             .bearer_auth(self.refresh_token().await?)
             .header("Content-Type", "multipart/related; boundary=gcs-storage")
-            .header("Content-Length", total_len)
+            // .header("Content-Length", total_len)
             .body(reqwest::Body::wrap_stream(mbody))
             .send()
             .await

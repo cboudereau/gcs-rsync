@@ -1,5 +1,4 @@
-use bytes::Bytes;
-use futures::{Stream, StreamExt, TryStreamExt};
+use futures::{Stream, StreamExt, TryStream, TryStreamExt};
 
 use crate::oauth2::token::TokenGenerator;
 
@@ -60,21 +59,18 @@ where
         super::StorageResult::Ok(())
     }
 
-    pub async fn upload_metadata<S, E>(
+    pub async fn upload_with_metadata<S>(
         &self,
         m: &ObjectMetadata,
         o: &Object,
         stream: S,
-        size: u32,
     ) -> StorageResult<()>
     where
-        S: futures::Stream<Item = Result<Bytes, E>> + Send + Sync + 'static,
-        E: Into<Box<dyn std::error::Error + Send + Sync>> + 'static,
+        S: TryStream<Ok = bytes::Bytes> + Send + Sync + 'static,
+        S::Error: Into<Box<dyn std::error::Error + Send + Sync>> + Send + Sync,
     {
         let url = o.upload_url("multipart");
-        self.storage_client
-            .post_multipart(&url, m, stream, size)
-            .await?;
+        self.storage_client.post_multipart(&url, m, stream).await?;
         super::StorageResult::Ok(())
     }
 

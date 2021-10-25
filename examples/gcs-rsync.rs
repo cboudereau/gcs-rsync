@@ -18,6 +18,10 @@ struct Opt {
     #[structopt(short, long)]
     mirror: bool,
 
+    /// Restore mtime on filesystem (disabled by default)
+    #[structopt(short, long)]
+    restore_fs_mtime: bool,
+
     /// Source path: can be either gs (gs://bucket/path/to/object) or fs source
     #[structopt()]
     source: String,
@@ -55,7 +59,7 @@ async fn main() -> RSyncResult<()> {
     let source = get_source(&opt.source, false).await?;
     let dest = get_source(&opt.dest, true).await?;
 
-    let rsync = RSync::new(source, dest);
+    let rsync = RSync::new(source, dest).with_set_fs_mtime(opt.restore_fs_mtime);
 
     if opt.mirror {
         println!("mirroring {} > {}", &opt.source, &opt.dest);

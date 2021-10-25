@@ -31,12 +31,14 @@ pub struct ObjectsListRequest {
 pub struct ObjectMetadata {
     pub metadata: Metadata,
 }
-
 #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Metadata {
-    #[serde(rename = "goog-reserved-file-mtime")] //compat with gsutil rsync
-    pub modification_time: Option<chrono::DateTime<chrono::Utc>>,
+    #[serde(
+        rename = "goog-reserved-file-mtime",
+        deserialize_with = "from_string_option"
+    )] //compat with gsutil rsync
+    pub modification_time: Option<i64>,
 }
 
 /// ObjectList response

@@ -3,6 +3,7 @@ mod gcs;
 
 use std::ops::Not;
 use std::path::{Path, PathBuf};
+use std::time::SystemTimeError;
 
 use bytes::Bytes;
 use futures::future::Either;
@@ -43,6 +44,8 @@ enum ReaderWriterInternal<T> {
     Fs(FsClient),
 }
 
+type Size = u64;
+
 impl<T> ReaderWriterInternal<T>
 where
     T: crate::oauth2::token::TokenGenerator,
@@ -77,7 +80,13 @@ where
         }
     }
 
-    async fn write<S>(&self, path: &RelativePath, stream: S) -> RSyncResult<()>
+    async fn write<S>(
+        &self,
+        mtime: Option<chrono::DateTime<chrono::Utc>>,
+        set_fs_mtime: bool,
+        path: &RelativePath,
+        stream: S,
+    ) -> RSyncResult<()>
     where
         S: futures::TryStream<Ok = bytes::Bytes, Error = RSyncError>
             + Send
@@ -86,8 +95,14 @@ where
             + 'static,
     {
         match self {
-            ReaderWriterInternal::Gcs(client) => client.write(path, stream).await,
-            ReaderWriterInternal::Fs(client) => client.write(path, stream).await,
+            ReaderWriterInternal::Gcs(client) => match mtime {
+                Some(mtime) => client.write_mtime(mtime, path, stream).await,
+                None => client.write(path, stream).await,
+            },
+            ReaderWriterInternal::Fs(client) => match (mtime, set_fs_mtime) {
+                (Some(mtime), true) => client.write_mtime(mtime, path, stream).await,
+                _ => client.write(path, stream).await,
+            },
         }
     }
 
@@ -104,12 +119,23 @@ where
             ReaderWriterInternal::Fs(client) => client.exists(path).await,
         }
     }
+
+    async fn size_and_mt(
+        &self,
+        path: &RelativePath,
+    ) -> RSyncResult<Option<(chrono::DateTime<chrono::Utc>, Size)>> {
+        match self {
+            ReaderWriterInternal::Gcs(client) => client.size_and_mt(path).await,
+            ReaderWriterInternal::Fs(client) => client.size_and_mt(path).await,
+        }
+    }
 }
 
 pub type DefaultRSync = RSync<crate::oauth2::token::AuthorizedUserCredentials>;
 pub struct RSync<T> {
     source: ReaderWriterInternal<T>,
     dest: ReaderWriterInternal<T>,
+    set_fs_mtime: bool,
 }
 
 impl<T> RSync<T>
@@ -120,31 +146,57 @@ where
         Self {
             source: source.inner,
             dest: dest.inner,
+            set_fs_mtime: false,
         }
     }
 
-    async fn write_entry(&self, path: &RelativePath) -> RSyncResult<()> {
+    pub fn with_set_fs_mtime(mut self, set_fs_mtime: bool) -> Self {
+        self.set_fs_mtime = set_fs_mtime;
+        self
+    }
+
+    async fn write_entry(
+        &self,
+        mtime: Option<chrono::DateTime<chrono::Utc>>,
+        path: &RelativePath,
+    ) -> RSyncResult<()> {
         let source = self.source.read(path).await;
-        self.dest.write(path, source).await?;
+        self.dest
+            .write(mtime, self.set_fs_mtime, path, source)
+            .await?;
         Ok(())
     }
 
     async fn sync_entry(&self, path: &RelativePath) -> RSyncResult<RSyncStatus> {
-        let crc = self.dest.get_crc32c(path).await?;
-
-        Ok(match crc {
-            None => {
-                self.write_entry(path).await?;
-                RSyncStatus::Created(path.to_owned())
-            }
-            Some(crc32c_dest) => {
-                let crc32c_source = self.source.get_crc32c(path).await?;
-                if Some(crc32c_dest) == crc32c_source {
+        Ok(match self.dest.size_and_mt(path).await? {
+            Some((dest_ts, dest_size)) => match self.source.size_and_mt(path).await? {
+                Some((source_ts, source_size))
+                    if dest_ts == source_ts && dest_size == source_size =>
+                {
                     RSyncStatus::AlreadySynced(path.to_owned())
-                } else {
-                    self.write_entry(path).await?;
-                    RSyncStatus::Updated(path.to_owned())
                 }
+                size_and_mt => match self.dest.get_crc32c(path).await? {
+                    None => {
+                        self.write_entry(size_and_mt.map(|(ts, _)| ts), path)
+                            .await?;
+                        RSyncStatus::Updated(path.to_owned())
+                    }
+                    Some(crc32c_dest) => {
+                        let crc32c_source = self.source.get_crc32c(path).await?;
+                        if Some(crc32c_dest) == crc32c_source {
+                            RSyncStatus::AlreadySynced(path.to_owned())
+                        } else {
+                            self.write_entry(size_and_mt.map(|(ts, _)| ts), path)
+                                .await?;
+                            RSyncStatus::Updated(path.to_owned())
+                        }
+                    }
+                },
+            },
+            None => {
+                let mtime = self.source.size_and_mt(path).await?.map(|(ts, _)| ts);
+                self.write_entry(mtime, path).await?;
+                RSyncStatus::Created(path.to_owned())
             }
         })
     }
@@ -327,6 +379,7 @@ impl Entry {
 
 #[derive(Debug)]
 pub enum RSyncError {
+    FsBadModificationTime(SystemTimeError),
     MissingFieldsInGcsResponse(String),
     StorageError(super::storage::Error),
     FsIoError {

@@ -1,5 +1,6 @@
 use crate::storage::{Error as StorageError, Metadata, ObjectMetadata};
 use bytes::Bytes;
+use chrono::TimeZone;
 use futures::{Stream, StreamExt, TryStreamExt};
 
 use super::{Entry, RSyncError, RelativePath};
@@ -71,6 +72,8 @@ impl ObjectPrefix {
         RelativePath::new(path)
     }
 }
+
+type Size = u64;
 
 impl<T> GcsClient<T>
 where
@@ -155,16 +158,34 @@ where
         }
     }
 
-    pub(super) async fn size_and_mt(&self, path: &RelativePath) -> RSyncResult<bool> {
+    pub(super) async fn size_and_mt(
+        &self,
+        path: &RelativePath,
+    ) -> RSyncResult<Option<(chrono::DateTime<chrono::Utc>, Size)>> {
         let o = &self.object_prefix.as_object(path)?;
         let entry = self
             .client
             .get(o, "size,metadata/goog-reserved-file-mtime")
             .await
             .map_err(RSyncError::StorageError);
+
         match entry {
-            Ok(_) => Ok(true),
-            Err(RSyncError::StorageError(StorageError::GcsResourceNotFound { .. })) => Ok(false),
+            Ok(entry) => {
+                let size = entry
+                    .size
+                    .ok_or_else(|| RSyncError::MissingFieldsInGcsResponse("size".to_owned()))?;
+                let mtime = entry
+                    .metadata
+                    .and_then(|x| x.modification_time)
+                    .ok_or_else(|| {
+                        RSyncError::MissingFieldsInGcsResponse(
+                            "metadata/goog-reserved-file-mtime".to_owned(),
+                        )
+                    })?;
+                let date_time = chrono::offset::Utc.timestamp(mtime, 0);
+                Ok(Some((date_time, size)))
+            }
+            Err(RSyncError::StorageError(StorageError::GcsResourceNotFound { .. })) => Ok(None),
             Err(err) => Err(err),
         }
     }
@@ -191,20 +212,17 @@ where
             .map(|_| ())
     }
 
-    pub(super) async fn write_multipart<S>(
+    pub(super) async fn write_mtime<S>(
         &self,
         mtime: chrono::DateTime<chrono::Utc>,
         path: &RelativePath,
         stream: S,
-        size: u32,
     ) -> RSyncResult<()>
     where
-        S: futures::Stream<Item = Result<bytes::Bytes, crate::storage::Error>>
-            + Send
-            + Sync
-            + 'static,
+        S: futures::TryStream<Ok = bytes::Bytes, Error = RSyncError> + Send + Sync + 'static,
     {
         let o = &self.object_prefix.as_object(path)?;
+        let mtime = mtime.timestamp();
         let m = ObjectMetadata {
             metadata: {
                 Metadata {
@@ -213,7 +231,7 @@ where
             },
         };
         self.client
-            .upload_metadata(&m, o, stream, size)
+            .upload_with_metadata(&m, o, stream)
             .await
             .map_err(RSyncError::StorageError)
             .map(|_| ())
