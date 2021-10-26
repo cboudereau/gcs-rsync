@@ -123,7 +123,7 @@ impl FsClient {
     pub(super) async fn size_and_mt(
         &self,
         path: &RelativePath,
-    ) -> RSyncResult<Option<(chrono::DateTime<chrono::Utc>, Size)>> {
+    ) -> RSyncResult<(Option<chrono::DateTime<chrono::Utc>>, Option<Size>)> {
         let path = self.prefix.as_file_path(path);
         match fs::metadata(path.as_path()).await {
             Ok(m) => {
@@ -131,9 +131,9 @@ impl FsClient {
                     RSyncError::fs_io_error("file modified time failed", path.as_path(), e)
                 })?;
                 let size = m.len();
-                Ok(Some((mtime.into(), size)))
+                Ok((Some(mtime.into()), Some(size)))
             }
-            _ => Ok(None),
+            _ => Ok((None, None)),
         }
     }
 

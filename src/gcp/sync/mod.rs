@@ -122,7 +122,7 @@ where
     async fn size_and_mt(
         &self,
         path: &RelativePath,
-    ) -> RSyncResult<Option<(chrono::DateTime<chrono::Utc>, Size)>> {
+    ) -> RSyncResult<(Option<chrono::DateTime<chrono::Utc>>, Option<Size>)> {
         match self {
             ReaderWriterInternal::Gcs(client) => client.size_and_mt(path).await,
             ReaderWriterInternal::Fs(client) => client.size_and_mt(path).await,
@@ -166,10 +166,28 @@ where
         Ok(())
     }
 
+    async fn sync_entry_crc32c(&self, path: &RelativePath) -> RSyncResult<RSyncStatus> {
+        Ok(match self.dest.get_crc32c(path).await? {
+            None => {
+                self.write_entry(None, path).await?;
+                RSyncStatus::updated("no dest crc32c", path)
+            }
+            Some(crc32c_dest) => {
+                let crc32c_source = self.source.get_crc32c(path).await?;
+                if Some(crc32c_dest) == crc32c_source {
+                    RSyncStatus::already_synced("same crc32c", path)
+                } else {
+                    self.write_entry(None, path).await?;
+                    RSyncStatus::updated("different crc32c", path)
+                }
+            }
+        })
+    }
+
     async fn sync_entry(&self, path: &RelativePath) -> RSyncResult<RSyncStatus> {
         Ok(match self.dest.size_and_mt(path).await? {
-            Some((dest_dt, dest_size)) => match self.source.size_and_mt(path).await? {
-                Some((source_dt, source_size)) => {
+            (Some(dest_dt), Some(dest_size)) => match self.source.size_and_mt(path).await? {
+                (Some(source_dt), Some(source_size)) => {
                     let dest_ts = dest_dt.timestamp();
                     let source_ts = source_dt.timestamp();
                     if dest_ts == source_ts && dest_size == source_size {
@@ -179,27 +197,14 @@ where
                         RSyncStatus::updated("different size or mtime", path)
                     }
                 }
-                None => match self.dest.get_crc32c(path).await? {
-                    None => {
-                        self.write_entry(None, path).await?;
-                        RSyncStatus::updated("no dest crc32c (no source mtime)", path)
-                    }
-                    Some(crc32c_dest) => {
-                        let crc32c_source = self.source.get_crc32c(path).await?;
-                        if Some(crc32c_dest) == crc32c_source {
-                            RSyncStatus::already_synced("same crc32c (no source mtime)", path)
-                        } else {
-                            self.write_entry(None, path).await?;
-                            RSyncStatus::updated("different crc32c (no source mtime)", path)
-                        }
-                    }
-                },
+                _ => self.sync_entry_crc32c(path).await?,
             },
-            None => {
-                let mtime = self.source.size_and_mt(path).await?.map(|(ts, _)| ts);
+            (None, None) => {
+                let (mtime, _) = self.source.size_and_mt(path).await?;
                 self.write_entry(mtime, path).await?;
                 RSyncStatus::Created(path.to_owned())
             }
+            _ => self.sync_entry_crc32c(path).await?,
         })
     }
 

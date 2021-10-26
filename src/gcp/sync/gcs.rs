@@ -161,7 +161,7 @@ where
     pub(super) async fn size_and_mt(
         &self,
         path: &RelativePath,
-    ) -> RSyncResult<Option<(chrono::DateTime<chrono::Utc>, Size)>> {
+    ) -> RSyncResult<(Option<chrono::DateTime<chrono::Utc>>, Option<Size>)> {
         let o = &self.object_prefix.as_object(path)?;
         let entry = self
             .client
@@ -171,21 +171,16 @@ where
 
         match entry {
             Ok(entry) => {
-                let size = entry
-                    .size
-                    .ok_or_else(|| RSyncError::MissingFieldsInGcsResponse("size".to_owned()))?;
-                let mtime = entry
+                let size = entry.size;
+                let date_time = entry
                     .metadata
                     .and_then(|x| x.modification_time)
-                    .ok_or_else(|| {
-                        RSyncError::MissingFieldsInGcsResponse(
-                            "metadata/goog-reserved-file-mtime".to_owned(),
-                        )
-                    })?;
-                let date_time = chrono::offset::Utc.timestamp(mtime, 0);
-                Ok(Some((date_time, size)))
+                    .map(|mtime| chrono::offset::Utc.timestamp(mtime, 0));
+                Ok((date_time, size))
             }
-            Err(RSyncError::StorageError(StorageError::GcsResourceNotFound { .. })) => Ok(None),
+            Err(RSyncError::StorageError(StorageError::GcsResourceNotFound { .. })) => {
+                Ok((None, None))
+            }
             Err(err) => Err(err),
         }
     }

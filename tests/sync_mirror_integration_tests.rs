@@ -2,7 +2,11 @@ use std::path::{Path, PathBuf};
 
 use futures::{StreamExt, TryStreamExt};
 use gcs_rsync::{
-    storage::credentials::authorizeduser,
+    oauth2::token::AuthorizedUserCredentials,
+    storage::{
+        credentials::{self, authorizeduser},
+        Object, ObjectClient, StorageResult,
+    },
     sync::{
         DefaultRSync, DefaultSource, RMirrorStatus, RSync, RSyncStatus, ReaderWriter, RelativePath,
     },
@@ -138,6 +142,84 @@ async fn test_fs_to_gcs_sync_and_mirror_with_restore_fs_mtime() {
 #[tokio::test]
 async fn test_fs_to_gcs_sync_and_mirror() {
     test_fs_to_gcs_sync_and_mirror_base(false).await;
+}
+
+#[tokio::test]
+async fn test_sync_and_mirror_crc32c() {
+    async fn assert_delete_ok(
+        object_client: &ObjectClient<AuthorizedUserCredentials>,
+        object: &Object,
+    ) {
+        let delete_result = object_client.delete(object).await;
+        assert!(
+            delete_result.is_ok(),
+            "unexpected error {:?} for {}",
+            delete_result,
+            object
+        );
+    }
+
+    async fn upload_bytes(
+        object_client: &ObjectClient<AuthorizedUserCredentials>,
+        object: &Object,
+        content: &str,
+    ) -> StorageResult<()> {
+        let data = bytes::Bytes::copy_from_slice(content.as_bytes());
+        let stream = futures::stream::once(futures::future::ok::<bytes::Bytes, String>(data));
+        object_client.upload(object, stream).await
+    }
+
+    async fn assert_upload_bytes(
+        object_client: &ObjectClient<AuthorizedUserCredentials>,
+        object: &Object,
+        content: &str,
+    ) {
+        let upload_result = upload_bytes(object_client, object, content).await;
+        assert!(
+            upload_result.is_ok(),
+            "unexpected error got {:?} for {}",
+            upload_result,
+            object
+        );
+    }
+
+    let gcs_src = GcsTestConfig::from_env().await;
+    let bucket = gcs_src.bucket();
+    let prefix = gcs_src.prefix();
+    let gcs_dst = GcsTestConfig::from_env().await;
+
+    let object = gcs_src.object("hello.txt");
+
+    let object_client = ObjectClient::new(gcs_src.token()).await.unwrap();
+    assert_upload_bytes(&object_client, &object, "hello").await;
+
+    let src = DefaultSource::gcs(
+        credentials::authorizeduser::default().await.unwrap(),
+        &bucket,
+        prefix.to_str().unwrap(),
+    )
+    .await
+    .unwrap();
+
+    let bucket = gcs_dst.bucket();
+    let prefix = gcs_dst.prefix();
+    let dest = DefaultSource::gcs(gcs_dst.token(), &bucket, prefix.to_str().unwrap())
+        .await
+        .unwrap();
+
+    let rsync = RSync::new(src, dest);
+    assert_eq!(vec![synced(created("hello.txt"))], mirror(&rsync).await);
+    assert_eq!(
+        vec![
+            synced(already_synced("same crc32c", "hello.txt")),
+            not_deleted("hello.txt")
+        ],
+        mirror(&rsync).await
+    );
+
+    assert_delete_ok(&object_client, &object).await;
+
+    assert_eq!(vec![deleted("hello.txt")], mirror(&rsync).await);
 }
 
 async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
