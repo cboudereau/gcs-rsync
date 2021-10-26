@@ -3,7 +3,9 @@ mod object;
 mod resources;
 
 pub use object::ObjectClient;
-pub use resources::object::{Bucket, Object, ObjectsListRequest, PartialObject};
+pub use resources::object::{
+    Bucket, Metadata, Object, ObjectMetadata, ObjectsListRequest, PartialObject,
+};
 
 pub mod credentials {
 
@@ -91,9 +93,26 @@ pub enum Error {
     GcsResourceNotFound {
         url: String,
     },
+    InvalidMetadata {
+        expected_type: String,
+        error: serde_json::Error,
+    },
 }
 
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+impl std::error::Error for Error {}
+
 impl Error {
+    fn gcs_invalid_metadata<T>(error: serde_json::Error) -> Self {
+        Self::InvalidMetadata {
+            expected_type: std::any::type_name::<T>().to_owned(),
+            error,
+        }
+    }
     fn gcs_unexpected_response_error<T, U>(url: T, value: U) -> Self
     where
         T: AsRef<str>,
@@ -116,3 +135,18 @@ impl Error {
 }
 
 pub type StorageResult<T> = std::result::Result<T, Error>;
+
+#[cfg(test)]
+mod tests {
+    use crate::storage::Error;
+    #[test]
+    fn test_error_display() {
+        let e = Error::gcs_unexpected_response_error("url", "value");
+        let actual = format!("{}", e);
+
+        assert_eq!(
+            "GcsUnexpectedResponse { url: \"url\", value: \"value\" }",
+            actual
+        );
+    }
+}

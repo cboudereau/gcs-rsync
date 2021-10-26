@@ -41,6 +41,8 @@ pub(super) struct FsClient {
     prefix: FsPrefix,
 }
 
+type Size = u64;
+
 impl FsClient {
     pub(super) fn new(base_path: &Path) -> Self {
         let prefix = FsPrefix::new(base_path);
@@ -118,6 +120,23 @@ impl FsClient {
         Ok(fs::metadata(path.as_path()).await.is_ok())
     }
 
+    pub(super) async fn size_and_mt(
+        &self,
+        path: &RelativePath,
+    ) -> RSyncResult<(Option<chrono::DateTime<chrono::Utc>>, Option<Size>)> {
+        let path = self.prefix.as_file_path(path);
+        match fs::metadata(path.as_path()).await {
+            Ok(m) => {
+                let mtime = m.modified().map_err(|e| {
+                    RSyncError::fs_io_error("file modified time failed", path.as_path(), e)
+                })?;
+                let size = m.len();
+                Ok((Some(mtime.into()), Some(size)))
+            }
+            _ => Ok((None, None)),
+        }
+    }
+
     pub(super) async fn delete(&self, path: &RelativePath) -> RSyncResult<()> {
         let file_path = self.prefix.as_file_path(path);
         fs::remove_file(file_path.as_path())
@@ -125,33 +144,62 @@ impl FsClient {
             .map_err(|e| RSyncError::fs_io_error("remove file failed", file_path.as_path(), e))
     }
 
-    pub(super) async fn write<S>(&self, path: &RelativePath, mut stream: S) -> RSyncResult<()>
+    async fn _write<S>(&self, file_path: &Path, mut stream: S) -> RSyncResult<()>
     where
         S: TryStream<Ok = Bytes, Error = RSyncError> + std::marker::Unpin,
     {
-        let file_path = self.prefix.as_file_path(path);
-
         if let Some(parent) = file_path.parent() {
             fs::create_dir_all(parent)
                 .await
                 .map_err(|e| RSyncError::fs_io_error("create dir all failed", parent, e))?
         }
 
-        let file = fs::File::create(file_path.as_path())
+        let file = fs::File::create(file_path)
             .await
-            .map_err(|e| RSyncError::fs_io_error("create file failed", file_path.as_path(), e))?;
+            .map_err(|e| RSyncError::fs_io_error("create file failed", file_path, e))?;
 
         let mut buf_writer = BufWriter::with_capacity(crate::DEFAULT_BUF_SIZE, file);
 
         while let Some(data) = stream.try_next().await? {
             buf_writer.write_all(&data).await.map_err(|e| {
-                RSyncError::fs_io_error("buffered write to file failed", file_path.as_path(), e)
+                RSyncError::fs_io_error("buffered write to file failed", file_path, e)
             })?;
         }
 
-        buf_writer.flush().await.map_err(|e| {
-            RSyncError::fs_io_error("buffer flush to file failed", file_path.as_path(), e)
-        })?;
+        buf_writer
+            .flush()
+            .await
+            .map_err(|e| RSyncError::fs_io_error("buffer flush to file failed", file_path, e))?;
+
+        Ok(())
+    }
+
+    fn set_mtime(path: &Path, mtime: chrono::DateTime<chrono::Utc>) -> RSyncResult<()> {
+        filetime::set_file_mtime(path, filetime::FileTime::from_system_time(mtime.into()))
+            .map_err(|e| RSyncError::fs_io_error("set_mtime failed", path, e))
+    }
+
+    pub(super) async fn write<S>(&self, path: &RelativePath, stream: S) -> RSyncResult<()>
+    where
+        S: TryStream<Ok = Bytes, Error = RSyncError> + std::marker::Unpin,
+    {
+        let file_path = self.prefix.as_file_path(path);
+        self._write(file_path.as_path(), stream).await
+    }
+
+    pub(super) async fn write_mtime<S>(
+        &self,
+        mtime: chrono::DateTime<chrono::Utc>,
+        path: &RelativePath,
+        stream: S,
+    ) -> RSyncResult<()>
+    where
+        S: TryStream<Ok = Bytes, Error = RSyncError> + std::marker::Unpin,
+    {
+        let file_path = self.prefix.as_file_path(path);
+        let file_path = file_path.as_path();
+        self._write(file_path, stream).await?;
+        Self::set_mtime(file_path, mtime)?;
 
         Ok(())
     }

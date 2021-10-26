@@ -2,7 +2,11 @@ use std::path::{Path, PathBuf};
 
 use futures::{StreamExt, TryStreamExt};
 use gcs_rsync::{
-    storage::credentials::authorizeduser,
+    oauth2::token::AuthorizedUserCredentials,
+    storage::{
+        credentials::{self, authorizeduser},
+        Object, ObjectClient, StorageResult,
+    },
     sync::{
         DefaultRSync, DefaultSource, RMirrorStatus, RSync, RSyncStatus, ReaderWriter, RelativePath,
     },
@@ -104,12 +108,18 @@ fn created(path: &str) -> RSyncStatus {
     RSyncStatus::Created(RelativePath::new(path).unwrap())
 }
 
-fn updated(path: &str) -> RSyncStatus {
-    RSyncStatus::Updated(RelativePath::new(path).unwrap())
+fn updated(reason: &str, path: &str) -> RSyncStatus {
+    RSyncStatus::Updated {
+        reason: reason.to_owned(),
+        path: RelativePath::new(path).unwrap(),
+    }
 }
 
-fn already_sinced(path: &str) -> RSyncStatus {
-    RSyncStatus::AlreadySynced(RelativePath::new(path).unwrap())
+fn already_synced(reason: &str, path: &str) -> RSyncStatus {
+    RSyncStatus::AlreadySynced {
+        reason: reason.to_owned(),
+        path: RelativePath::new(path).unwrap(),
+    }
 }
 
 fn deleted(path: &str) -> RMirrorStatus {
@@ -125,7 +135,94 @@ fn synced(x: RSyncStatus) -> RMirrorStatus {
 }
 
 #[tokio::test]
+async fn test_fs_to_gcs_sync_and_mirror_with_restore_fs_mtime() {
+    test_fs_to_gcs_sync_and_mirror_base(true).await;
+}
+
+#[tokio::test]
 async fn test_fs_to_gcs_sync_and_mirror() {
+    test_fs_to_gcs_sync_and_mirror_base(false).await;
+}
+
+#[tokio::test]
+async fn test_sync_and_mirror_crc32c() {
+    async fn assert_delete_ok(
+        object_client: &ObjectClient<AuthorizedUserCredentials>,
+        object: &Object,
+    ) {
+        let delete_result = object_client.delete(object).await;
+        assert!(
+            delete_result.is_ok(),
+            "unexpected error {:?} for {}",
+            delete_result,
+            object
+        );
+    }
+
+    async fn upload_bytes(
+        object_client: &ObjectClient<AuthorizedUserCredentials>,
+        object: &Object,
+        content: &str,
+    ) -> StorageResult<()> {
+        let data = bytes::Bytes::copy_from_slice(content.as_bytes());
+        let stream = futures::stream::once(futures::future::ok::<bytes::Bytes, String>(data));
+        object_client.upload(object, stream).await
+    }
+
+    async fn assert_upload_bytes(
+        object_client: &ObjectClient<AuthorizedUserCredentials>,
+        object: &Object,
+        content: &str,
+    ) {
+        let upload_result = upload_bytes(object_client, object, content).await;
+        assert!(
+            upload_result.is_ok(),
+            "unexpected error got {:?} for {}",
+            upload_result,
+            object
+        );
+    }
+
+    let gcs_src = GcsTestConfig::from_env().await;
+    let bucket = gcs_src.bucket();
+    let prefix = gcs_src.prefix();
+    let gcs_dst = GcsTestConfig::from_env().await;
+
+    let object = gcs_src.object("hello.txt");
+
+    let object_client = ObjectClient::new(gcs_src.token()).await.unwrap();
+    assert_upload_bytes(&object_client, &object, "hello").await;
+
+    let src = DefaultSource::gcs(
+        credentials::authorizeduser::default().await.unwrap(),
+        &bucket,
+        prefix.to_str().unwrap(),
+    )
+    .await
+    .unwrap();
+
+    let bucket = gcs_dst.bucket();
+    let prefix = gcs_dst.prefix();
+    let dest = DefaultSource::gcs(gcs_dst.token(), &bucket, prefix.to_str().unwrap())
+        .await
+        .unwrap();
+
+    let rsync = RSync::new(src, dest);
+    assert_eq!(vec![synced(created("hello.txt"))], mirror(&rsync).await);
+    assert_eq!(
+        vec![
+            synced(already_synced("same crc32c", "hello.txt")),
+            not_deleted("hello.txt")
+        ],
+        mirror(&rsync).await
+    );
+
+    assert_delete_ok(&object_client, &object).await;
+
+    assert_eq!(vec![deleted("hello.txt")], mirror(&rsync).await);
+}
+
+async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
     let src_t = FsTestConfig::new();
 
     let file_names = vec![
@@ -188,10 +285,13 @@ async fn test_fs_to_gcs_sync_and_mirror() {
     let fs_replica_t2 = FsTestConfig::new();
     let fs_dest_replica2 = DefaultSource::fs(fs_replica_t2.base_path.as_path());
 
-    let rsync_fs_to_gcs = RSync::new(fs_source, gcs_dest);
-    let rsync_gcs_to_gcs_replica = RSync::new(gcs_source_replica, gcs_dest_replica);
-    let rsync_fs_to_fs_replica = RSync::new(fs_source_replica, fs_dest_replica);
-    let rsync_gs_to_fs_replica = RSync::new(gcs_source_replica2, fs_dest_replica2);
+    let rsync_fs_to_gcs = RSync::new(fs_source, gcs_dest).with_restore_fs_mtime(set_fs_mtime);
+    let rsync_gcs_to_gcs_replica =
+        RSync::new(gcs_source_replica, gcs_dest_replica).with_restore_fs_mtime(set_fs_mtime);
+    let rsync_fs_to_fs_replica =
+        RSync::new(fs_source_replica, fs_dest_replica).with_restore_fs_mtime(set_fs_mtime);
+    let rsync_gs_to_fs_replica =
+        RSync::new(gcs_source_replica2, fs_dest_replica2).with_restore_fs_mtime(set_fs_mtime);
 
     let expected = vec![
         created("a/long/path/hello_world.toml"),
@@ -204,32 +304,42 @@ async fn test_fs_to_gcs_sync_and_mirror() {
     assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
 
     let expected = vec![
-        already_sinced("a/long/path/hello_world.toml"),
-        already_sinced("hello/world/test.txt"),
-        already_sinced("test.json"),
+        already_synced("same mtime and size", "a/long/path/hello_world.toml"),
+        already_synced("same mtime and size", "hello/world/test.txt"),
+        already_synced("same mtime and size", "test.json"),
     ];
     assert_eq!(expected, sync(&rsync_fs_to_gcs).await);
     assert_eq!(expected, sync(&rsync_gcs_to_gcs_replica).await);
-    assert_eq!(expected, sync(&rsync_fs_to_fs_replica).await);
-    assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
+    if set_fs_mtime {
+        assert_eq!(expected, sync(&rsync_fs_to_fs_replica).await);
+        assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
+    } else {
+        sync(&rsync_fs_to_fs_replica).await;
+        sync(&rsync_gs_to_fs_replica).await;
+    }
 
     write_to_file(src_t.file_path("test.json").as_path(), "updated").await;
     let new_file = src_t.file_path("new.json");
     write_to_file(new_file.as_path(), "new file").await;
     let expected = vec![
         created("new.json"),
-        updated("test.json"),
-        already_sinced("a/long/path/hello_world.toml"),
-        already_sinced("hello/world/test.txt"),
+        updated("different size or mtime", "test.json"),
+        already_synced("same mtime and size", "a/long/path/hello_world.toml"),
+        already_synced("same mtime and size", "hello/world/test.txt"),
     ];
     assert_eq!(expected, sync(&rsync_fs_to_gcs).await);
     assert_eq!(expected, sync(&rsync_gcs_to_gcs_replica).await);
-    assert_eq!(expected, sync(&rsync_fs_to_fs_replica).await);
-    assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
+    if set_fs_mtime {
+        assert_eq!(expected, sync(&rsync_fs_to_fs_replica).await);
+        assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
+    } else {
+        sync(&rsync_fs_to_fs_replica).await;
+        sync(&rsync_gs_to_fs_replica).await;
+    }
 
     delete_files(&file_names[..]).await;
     let expected = vec![
-        synced(already_sinced("new.json")),
+        synced(already_synced("same mtime and size", "new.json")),
         deleted("a/long/path/hello_world.toml"),
         deleted("hello/world/test.txt"),
         deleted("test.json"),
@@ -237,8 +347,13 @@ async fn test_fs_to_gcs_sync_and_mirror() {
     ];
     assert_eq!(expected, mirror(&rsync_fs_to_gcs).await);
     assert_eq!(expected, mirror(&rsync_gcs_to_gcs_replica).await);
-    assert_eq!(expected, mirror(&rsync_fs_to_fs_replica).await);
-    assert_eq!(expected, mirror(&rsync_gs_to_fs_replica).await);
+    if set_fs_mtime {
+        assert_eq!(expected, mirror(&rsync_fs_to_fs_replica).await);
+        assert_eq!(expected, mirror(&rsync_gs_to_fs_replica).await);
+    } else {
+        mirror(&rsync_fs_to_fs_replica).await;
+        mirror(&rsync_gs_to_fs_replica).await;
+    }
 
     delete_file(new_file.as_path()).await;
     let expected = vec![deleted("new.json")];

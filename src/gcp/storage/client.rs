@@ -3,7 +3,11 @@ use crate::gcp::{
     oauth2::token::{AccessToken, Token, TokenGenerator},
     Client,
 };
-use futures::{Stream, TryStream, TryStreamExt};
+use bytes::BufMut;
+use futures::{
+    stream,
+    stream::{Stream, StreamExt, TryStream, TryStreamExt},
+};
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::RwLock;
 
@@ -13,6 +17,11 @@ pub(super) struct StorageClient<T> {
     token_generator: T,
     token: RwLock<Token>,
 }
+
+const MT_SEPARATOR: &[u8] = b"--gcs-storage\n";
+const MT_END_SEPARATOR: &[u8] = b"\n--gcs-storage--";
+const MT_CONTENT_TYPE: &[u8] = b"Content-Type: application/octet-stream";
+const MT_METADATA_TYPE: &[u8] = b"Content-Type: application/json; charset=utf-8\n\n";
 
 impl<T: TokenGenerator> StorageClient<T> {
     pub async fn new(token_generator: T) -> StorageResult<Self> {
@@ -88,6 +97,74 @@ impl<T: TokenGenerator> StorageClient<T> {
             .post(url)
             .bearer_auth(self.refresh_token().await?)
             .body(reqwest::Body::wrap_stream(body))
+            .send()
+            .await
+            .map_err(super::Error::GcsHttpError)?;
+
+        Self::success_response(url, response).await?;
+        Ok(())
+    }
+
+    // Specs: https://cloud.google.com/storage/docs/json_api/v1/how-tos/multipart-upload
+    // POST https://www.googleapis.com/upload/storage/v1/b/test-bucket/o?uploadType=multipart&name=path%2Fobject.txt HTTP/1.1
+    // Authorization: Bearer <Token>
+    // Content-Type: multipart/related; boundary=gcs-storage
+    // Content-Length: <BodyLength>
+    //
+    // --gcs-storage
+    // Content-Type: application/json; charset=UTF-8
+    //
+    // {
+    // "test": "hello"
+    // }
+    //
+    // --gcs-storage
+    // Content-Type: application/octet-stream
+    //
+    // <ObjectStream>
+    // --gcs-storage--
+    pub async fn post_multipart<S, M>(&self, url: &str, metadata: &M, body: S) -> StorageResult<()>
+    where
+        M: Serialize,
+        S: TryStream<Ok = bytes::Bytes> + Send + Sync + 'static,
+        S::Error: Into<Box<dyn std::error::Error + Send + Sync>> + Send + Sync,
+    {
+        let json = serde_json::ser::to_vec(metadata).map_err(Error::gcs_invalid_metadata::<M>)?;
+
+        let part_len = 2 * MT_SEPARATOR.len()
+            + MT_METADATA_TYPE.len()
+            + json.len()
+            + MT_CONTENT_TYPE.len()
+            + 3;
+        let part = {
+            let mut part = bytes::BytesMut::with_capacity(part_len);
+            part.put_slice(MT_SEPARATOR);
+            part.put_slice(MT_METADATA_TYPE);
+            part.put_slice(&json);
+            part.put_slice(b"\n");
+            part.put_slice(MT_SEPARATOR);
+            part.put_slice(MT_CONTENT_TYPE);
+            part.put_slice(b"\n\n");
+
+            part.freeze()
+        };
+        let mbody = {
+            stream::iter([Ok(part)])
+                .chain(body.into_stream())
+                .chain(stream::iter([Ok(bytes::Bytes::from_static(
+                    MT_END_SEPARATOR,
+                ))]))
+        };
+
+        // let total_len = part_len as u64 + size + MT_END_SEPARATOR.len() as u64;
+        let response = self
+            .client
+            .client
+            .post(url)
+            .bearer_auth(self.refresh_token().await?)
+            .header("Content-Type", "multipart/related; boundary=gcs-storage")
+            // .header("Content-Length", total_len)
+            .body(reqwest::Body::wrap_stream(mbody))
             .send()
             .await
             .map_err(super::Error::GcsHttpError)?;

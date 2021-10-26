@@ -4,7 +4,8 @@ use futures::{StreamExt, TryStreamExt};
 use gcs_rsync::{
     oauth2::token::AuthorizedUserCredentials,
     storage::{
-        credentials, Object, ObjectClient, ObjectsListRequest, PartialObject, StorageResult,
+        credentials, Metadata, Object, ObjectClient, ObjectMetadata, ObjectsListRequest,
+        PartialObject, StorageResult,
     },
 };
 
@@ -98,6 +99,35 @@ async fn assert_download_bytes(
 }
 
 #[tokio::test]
+async fn test_upload_multipart() {
+    let test_config = GcsTestConfig::from_env().await;
+    let object = test_config.object("with/path/object_mutlipart.txt");
+    let object_client = ObjectClient::new(test_config.token()).await.unwrap();
+
+    let content = b"test multipart";
+
+    let data = bytes::Bytes::copy_from_slice(content);
+    let stream = futures::stream::once(futures::future::ok::<bytes::Bytes, String>(data));
+    let now = chrono::offset::Utc::now().timestamp();
+    let metadata = ObjectMetadata {
+        metadata: Metadata {
+            modification_time: Some(now),
+        },
+    };
+    object_client
+        .upload_with_metadata(&metadata, &object, stream)
+        .await
+        .unwrap();
+    let actual = object_client
+        .get(&object, "size, metadata/goog-reserved-file-mtime")
+        .await
+        .unwrap();
+    assert_delete_ok(&object_client, &object).await;
+    assert_eq!(Some(now), actual.metadata.and_then(|x| x.modification_time));
+    assert_eq!(Some(content.len() as u64), actual.size);
+}
+
+#[tokio::test]
 async fn test_delete_upload_download_delete() {
     let test_config = GcsTestConfig::from_env().await;
     let object = test_config.object("object.txt");
@@ -125,6 +155,22 @@ async fn test_get_object_ok() {
     assert!(partial_object.name.unwrap().ends_with("object.txt"));
     assert!(partial_object.self_link.unwrap().ends_with("%2Fobject.txt"));
     assert_eq!(None, partial_object.crc32c);
+    assert_delete_ok(&object_client, &object).await;
+}
+
+#[tokio::test]
+async fn test_get_object_size() {
+    let test_config = GcsTestConfig::from_env().await;
+    let object = test_config.object("object.txt");
+    let object_client = ObjectClient::new(test_config.token()).await.unwrap();
+
+    let content = "hello";
+    assert_delete_err(&object_client, &object).await;
+    assert_upload_bytes(&object_client, &object, content).await;
+
+    let partial_object = object_client.get(&object, "size").await.unwrap();
+
+    assert_eq!(5, partial_object.size.unwrap());
     assert_delete_ok(&object_client, &object).await;
 }
 
