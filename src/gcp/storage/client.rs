@@ -11,6 +11,7 @@ use futures::{
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::RwLock;
 
+#[derive(Debug)]
 pub(super) struct StorageClient<T> {
     client: Client,
     token_generator: T,
