@@ -134,7 +134,7 @@ pub type DefaultRSync = RSync<crate::oauth2::token::AuthorizedUserCredentials>;
 pub struct RSync<T> {
     source: ReaderWriterInternal<T>,
     dest: ReaderWriterInternal<T>,
-    set_fs_mtime: bool,
+    restore_fs_mtime: bool,
 }
 
 impl<T> RSync<T>
@@ -145,12 +145,12 @@ where
         Self {
             source: source.inner,
             dest: dest.inner,
-            set_fs_mtime: false,
+            restore_fs_mtime: false,
         }
     }
 
-    pub fn with_set_fs_mtime(mut self, set_fs_mtime: bool) -> Self {
-        self.set_fs_mtime = set_fs_mtime;
+    pub fn with_restore_fs_mtime(mut self, restore_fs_mtime: bool) -> Self {
+        self.restore_fs_mtime = restore_fs_mtime;
         self
     }
 
@@ -161,33 +161,36 @@ where
     ) -> RSyncResult<()> {
         let source = self.source.read(path).await;
         self.dest
-            .write(mtime, self.set_fs_mtime, path, source)
+            .write(mtime, self.restore_fs_mtime, path, source)
             .await?;
         Ok(())
     }
 
     async fn sync_entry(&self, path: &RelativePath) -> RSyncResult<RSyncStatus> {
         Ok(match self.dest.size_and_mt(path).await? {
-            Some((dest_ts, dest_size)) => match self.source.size_and_mt(path).await? {
-                Some((source_ts, source_size))
-                    if dest_ts == source_ts && dest_size == source_size =>
-                {
-                    RSyncStatus::AlreadySynced(path.to_owned())
+            Some((dest_dt, dest_size)) => match self.source.size_and_mt(path).await? {
+                Some((source_dt, source_size)) => {
+                    let dest_ts = dest_dt.timestamp();
+                    let source_ts = source_dt.timestamp();
+                    if dest_ts == source_ts && dest_size == source_size {
+                        RSyncStatus::already_synced("same mtime and size", path)
+                    } else {
+                        self.write_entry(Some(source_dt), path).await?;
+                        RSyncStatus::updated("different size or mtime", path)
+                    }
                 }
-                size_and_mt => match self.dest.get_crc32c(path).await? {
+                None => match self.dest.get_crc32c(path).await? {
                     None => {
-                        self.write_entry(size_and_mt.map(|(ts, _)| ts), path)
-                            .await?;
-                        RSyncStatus::Updated(path.to_owned())
+                        self.write_entry(None, path).await?;
+                        RSyncStatus::updated("no dest crc32c (no source mtime)", path)
                     }
                     Some(crc32c_dest) => {
                         let crc32c_source = self.source.get_crc32c(path).await?;
                         if Some(crc32c_dest) == crc32c_source {
-                            RSyncStatus::AlreadySynced(path.to_owned())
+                            RSyncStatus::already_synced("same crc32c (no source mtime)", path)
                         } else {
-                            self.write_entry(size_and_mt.map(|(ts, _)| ts), path)
-                                .await?;
-                            RSyncStatus::Updated(path.to_owned())
+                            self.write_entry(None, path).await?;
+                            RSyncStatus::updated("different crc32c (no source mtime)", path)
                         }
                     }
                 },
@@ -413,8 +416,22 @@ impl std::error::Error for RSyncError {}
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RSyncStatus {
     Created(RelativePath),
-    Updated(RelativePath),
-    AlreadySynced(RelativePath),
+    Updated { reason: String, path: RelativePath },
+    AlreadySynced { reason: String, path: RelativePath },
+}
+
+impl RSyncStatus {
+    fn updated(reason: &str, path: &RelativePath) -> Self {
+        let reason = reason.to_owned();
+        let path = path.to_owned();
+        Self::Updated { reason, path }
+    }
+
+    fn already_synced(reason: &str, path: &RelativePath) -> Self {
+        let reason = reason.to_owned();
+        let path = path.to_owned();
+        Self::AlreadySynced { reason, path }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]

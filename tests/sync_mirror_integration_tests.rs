@@ -104,12 +104,18 @@ fn created(path: &str) -> RSyncStatus {
     RSyncStatus::Created(RelativePath::new(path).unwrap())
 }
 
-fn updated(path: &str) -> RSyncStatus {
-    RSyncStatus::Updated(RelativePath::new(path).unwrap())
+fn updated(reason: &str, path: &str) -> RSyncStatus {
+    RSyncStatus::Updated {
+        reason: reason.to_owned(),
+        path: RelativePath::new(path).unwrap(),
+    }
 }
 
-fn already_sinced(path: &str) -> RSyncStatus {
-    RSyncStatus::AlreadySynced(RelativePath::new(path).unwrap())
+fn already_synced(reason: &str, path: &str) -> RSyncStatus {
+    RSyncStatus::AlreadySynced {
+        reason: reason.to_owned(),
+        path: RelativePath::new(path).unwrap(),
+    }
 }
 
 fn deleted(path: &str) -> RMirrorStatus {
@@ -197,13 +203,13 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
     let fs_replica_t2 = FsTestConfig::new();
     let fs_dest_replica2 = DefaultSource::fs(fs_replica_t2.base_path.as_path());
 
-    let rsync_fs_to_gcs = RSync::new(fs_source, gcs_dest).with_set_fs_mtime(set_fs_mtime);
+    let rsync_fs_to_gcs = RSync::new(fs_source, gcs_dest).with_restore_fs_mtime(set_fs_mtime);
     let rsync_gcs_to_gcs_replica =
-        RSync::new(gcs_source_replica, gcs_dest_replica).with_set_fs_mtime(set_fs_mtime);
+        RSync::new(gcs_source_replica, gcs_dest_replica).with_restore_fs_mtime(set_fs_mtime);
     let rsync_fs_to_fs_replica =
-        RSync::new(fs_source_replica, fs_dest_replica).with_set_fs_mtime(set_fs_mtime);
+        RSync::new(fs_source_replica, fs_dest_replica).with_restore_fs_mtime(set_fs_mtime);
     let rsync_gs_to_fs_replica =
-        RSync::new(gcs_source_replica2, fs_dest_replica2).with_set_fs_mtime(set_fs_mtime);
+        RSync::new(gcs_source_replica2, fs_dest_replica2).with_restore_fs_mtime(set_fs_mtime);
 
     let expected = vec![
         created("a/long/path/hello_world.toml"),
@@ -216,32 +222,42 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
     assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
 
     let expected = vec![
-        already_sinced("a/long/path/hello_world.toml"),
-        already_sinced("hello/world/test.txt"),
-        already_sinced("test.json"),
+        already_synced("same mtime and size", "a/long/path/hello_world.toml"),
+        already_synced("same mtime and size", "hello/world/test.txt"),
+        already_synced("same mtime and size", "test.json"),
     ];
     assert_eq!(expected, sync(&rsync_fs_to_gcs).await);
     assert_eq!(expected, sync(&rsync_gcs_to_gcs_replica).await);
-    assert_eq!(expected, sync(&rsync_fs_to_fs_replica).await);
-    assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
+    if set_fs_mtime {
+        assert_eq!(expected, sync(&rsync_fs_to_fs_replica).await);
+        assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
+    } else {
+        sync(&rsync_fs_to_fs_replica).await;
+        sync(&rsync_gs_to_fs_replica).await;
+    }
 
     write_to_file(src_t.file_path("test.json").as_path(), "updated").await;
     let new_file = src_t.file_path("new.json");
     write_to_file(new_file.as_path(), "new file").await;
     let expected = vec![
         created("new.json"),
-        updated("test.json"),
-        already_sinced("a/long/path/hello_world.toml"),
-        already_sinced("hello/world/test.txt"),
+        updated("different size or mtime", "test.json"),
+        already_synced("same mtime and size", "a/long/path/hello_world.toml"),
+        already_synced("same mtime and size", "hello/world/test.txt"),
     ];
     assert_eq!(expected, sync(&rsync_fs_to_gcs).await);
     assert_eq!(expected, sync(&rsync_gcs_to_gcs_replica).await);
-    assert_eq!(expected, sync(&rsync_fs_to_fs_replica).await);
-    assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
+    if set_fs_mtime {
+        assert_eq!(expected, sync(&rsync_fs_to_fs_replica).await);
+        assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
+    } else {
+        sync(&rsync_fs_to_fs_replica).await;
+        sync(&rsync_gs_to_fs_replica).await;
+    }
 
     delete_files(&file_names[..]).await;
     let expected = vec![
-        synced(already_sinced("new.json")),
+        synced(already_synced("same mtime and size", "new.json")),
         deleted("a/long/path/hello_world.toml"),
         deleted("hello/world/test.txt"),
         deleted("test.json"),
@@ -249,8 +265,13 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
     ];
     assert_eq!(expected, mirror(&rsync_fs_to_gcs).await);
     assert_eq!(expected, mirror(&rsync_gcs_to_gcs_replica).await);
-    assert_eq!(expected, mirror(&rsync_fs_to_fs_replica).await);
-    assert_eq!(expected, mirror(&rsync_gs_to_fs_replica).await);
+    if set_fs_mtime {
+        assert_eq!(expected, mirror(&rsync_fs_to_fs_replica).await);
+        assert_eq!(expected, mirror(&rsync_gs_to_fs_replica).await);
+    } else {
+        mirror(&rsync_fs_to_fs_replica).await;
+        mirror(&rsync_gs_to_fs_replica).await;
+    }
 
     delete_file(new_file.as_path()).await;
     let expected = vec![deleted("new.json")];

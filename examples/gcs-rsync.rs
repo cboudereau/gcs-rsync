@@ -59,7 +59,7 @@ async fn main() -> RSyncResult<()> {
     let source = get_source(&opt.source, false).await?;
     let dest = get_source(&opt.dest, true).await?;
 
-    let rsync = RSync::new(source, dest).with_set_fs_mtime(opt.restore_fs_mtime);
+    let rsync = RSync::new(source, dest).with_restore_fs_mtime(opt.restore_fs_mtime);
 
     if opt.mirror {
         println!("mirroring {} > {}", &opt.source, &opt.dest);
