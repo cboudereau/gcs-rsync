@@ -13,7 +13,16 @@ gcs-rsync is faster than [gsutil rsync](https://cloud.google.com/storage/docs/gs
 
 no hard limit to 32K objects or specific conf to compute state.
 
-## How to install
+## How to install as lib
+
+Cargo.toml
+
+```bash
+[dependencies]
+gcs-rsync = "0.1"
+```
+
+## How to install as cli tool
 
 ```bash
 cargo install --example gcs-rsync gcs-rsync
