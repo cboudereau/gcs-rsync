@@ -135,3 +135,18 @@ impl Error {
 }
 
 pub type StorageResult<T> = std::result::Result<T, Error>;
+
+#[cfg(test)]
+mod tests {
+    use crate::storage::Error;
+    #[test]
+    fn test_error_display() {
+        let e = Error::gcs_unexpected_response_error("url", "value");
+        let actual = format!("{}", e);
+
+        assert_eq!(
+            "GcsUnexpectedResponse { url: \"url\", value: \"value\" }",
+            actual
+        );
+    }
+}
