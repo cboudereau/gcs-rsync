@@ -11,6 +11,8 @@ Lightweight and efficient Rust gcs rsync for Google Cloud Storage.
 
 gcs-rsync is faster than [gsutil rsync](https://cloud.google.com/storage/docs/gsutil/commands/rsync) according to the following benchmarks.
 
+no hard limit to 32K objects or specific conf to compute state.
+
 ## How to install
 
 ```bash
