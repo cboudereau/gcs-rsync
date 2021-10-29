@@ -6,6 +6,7 @@ WORKDIR /app
 RUN cargo build --release --target=x86_64-unknown-linux-musl --example gcs-rsync
 
 FROM alpine
+ENV GOOGLE_APPLICATION_CREDENTIALS=/creds.json
 COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/examples/gcs-rsync /app/gcs-rsync
 WORKDIR /app
 ENTRYPOINT [ "/app/gcs-rsync" ]
