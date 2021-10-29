@@ -6,6 +6,7 @@
 [![docs.rs](https://docs.rs/gcs-rsync/badge.svg)](https://docs.rs/gcs-rsync)
 [![crates.io](https://img.shields.io/crates/v/gcs-rsync.svg)](https://crates.io/crates/gcs-rsync)
 [![crates.io (recent)](https://img.shields.io/crates/dr/gcs-rsync)](https://crates.io/crates/gcs-rsync)
+[![docker](https://img.shields.io/docker/pulls/superbeeeeeee/gcs-rsync)](https://hub.docker.com/r/superbeeeeeee/gcs-rsync)
 
 Lightweight and efficient Rust gcs rsync for Google Cloud Storage.
 
