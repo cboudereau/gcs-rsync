@@ -1,9 +1,6 @@
 name: publish
 
 on:
-  pull_request:
-    branches: 
-      - '*'
   release:
     types: [published]
   workflow_dispatch:
