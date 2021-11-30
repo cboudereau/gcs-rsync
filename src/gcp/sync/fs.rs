@@ -87,10 +87,20 @@ impl FsClient {
 
     pub(super) async fn read(&self, path: &RelativePath) -> impl Stream<Item = RSyncResult<Bytes>> {
         let path = self.prefix.as_file_path(path);
-        let file = fs::File::open(path.as_path()).await.unwrap();
-        FramedRead::with_capacity(file, BytesCodec::new(), crate::DEFAULT_BUF_SIZE)
-            .map_err(move |err| RSyncError::fs_io_error("read failure", path.as_path(), err))
-            .map_ok(|x| x.freeze())
+
+        futures::stream::once(async move {
+            fs::File::open(path.as_path())
+                .await
+                .map_err(|e| RSyncError::fs_io_error("could not open file", path.as_path(), e))
+                .map(|file| {
+                    FramedRead::with_capacity(file, BytesCodec::new(), crate::DEFAULT_BUF_SIZE)
+                        .map_err(move |err| {
+                            RSyncError::fs_io_error("read failure", path.as_path(), err)
+                        })
+                        .map_ok(|x| x.freeze())
+                })
+        })
+        .try_flatten()
     }
 
     pub(super) async fn get_crc32c(&self, path: &RelativePath) -> RSyncResult<Option<Entry>> {
@@ -144,9 +154,9 @@ impl FsClient {
             .map_err(|e| RSyncError::fs_io_error("remove file failed", file_path.as_path(), e))
     }
 
-    async fn _write<S>(&self, file_path: &Path, mut stream: S) -> RSyncResult<()>
+    async fn write_internal<S>(&self, file_path: &Path, stream: S) -> RSyncResult<()>
     where
-        S: TryStream<Ok = Bytes, Error = RSyncError> + std::marker::Unpin,
+        S: TryStream<Ok = Bytes, Error = RSyncError>,
     {
         if let Some(parent) = file_path.parent() {
             fs::create_dir_all(parent)
@@ -158,13 +168,17 @@ impl FsClient {
             .await
             .map_err(|e| RSyncError::fs_io_error("create file failed", file_path, e))?;
 
-        let mut buf_writer = BufWriter::with_capacity(crate::DEFAULT_BUF_SIZE, file);
-
-        while let Some(data) = stream.try_next().await? {
-            buf_writer.write_all(&data).await.map_err(|e| {
-                RSyncError::fs_io_error("buffered write to file failed", file_path, e)
-            })?;
-        }
+        let mut buf_writer = stream
+            .try_fold(
+                BufWriter::with_capacity(crate::DEFAULT_BUF_SIZE, file),
+                |mut buf_writer, data| async move {
+                    let _ = buf_writer.write_all(&data).await.map_err(|e| {
+                        RSyncError::fs_io_error("buffered write to file failed", file_path, e)
+                    })?;
+                    Ok(buf_writer)
+                },
+            )
+            .await?;
 
         buf_writer
             .flush()
@@ -181,10 +195,10 @@ impl FsClient {
 
     pub(super) async fn write<S>(&self, path: &RelativePath, stream: S) -> RSyncResult<()>
     where
-        S: TryStream<Ok = Bytes, Error = RSyncError> + std::marker::Unpin,
+        S: TryStream<Ok = Bytes, Error = RSyncError>,
     {
         let file_path = self.prefix.as_file_path(path);
-        self._write(file_path.as_path(), stream).await
+        self.write_internal(file_path.as_path(), stream).await
     }
 
     pub(super) async fn write_mtime<S>(
@@ -194,11 +208,11 @@ impl FsClient {
         stream: S,
     ) -> RSyncResult<()>
     where
-        S: TryStream<Ok = Bytes, Error = RSyncError> + std::marker::Unpin,
+        S: TryStream<Ok = Bytes, Error = RSyncError>,
     {
         let file_path = self.prefix.as_file_path(path);
         let file_path = file_path.as_path();
-        self._write(file_path, stream).await?;
+        self.write_internal(file_path, stream).await?;
         Self::set_mtime(file_path, mtime)?;
 
         Ok(())

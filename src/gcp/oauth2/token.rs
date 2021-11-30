@@ -11,6 +11,7 @@ use std::{
 #[derive(Deserialize, Debug, Clone)]
 pub struct Token {
     access_token: String,
+    #[allow(dead_code)]
     token_type: String,
     #[serde(
         deserialize_with = "from_expires_in",
