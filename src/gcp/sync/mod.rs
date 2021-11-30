@@ -87,22 +87,21 @@ where
         stream: S,
     ) -> RSyncResult<()>
     where
-        S: futures::TryStream<Ok = bytes::Bytes, Error = RSyncError>
-            + Send
-            + Sync
-            + std::marker::Unpin
-            + 'static,
+        S: futures::TryStream<Ok = bytes::Bytes, Error = RSyncError> + Send + Sync + 'static,
     {
-        match self {
-            ReaderWriterInternal::Gcs(client) => match mtime {
-                Some(mtime) => client.write_mtime(mtime, path, stream).await,
-                None => client.write(path, stream).await,
-            },
-            ReaderWriterInternal::Fs(client) => match (mtime, set_fs_mtime) {
-                (Some(mtime), true) => client.write_mtime(mtime, path, stream).await,
-                _ => client.write(path, stream).await,
-            },
+        async {
+            match self {
+                ReaderWriterInternal::Gcs(client) => match mtime {
+                    Some(mtime) => client.write_mtime(mtime, path, stream).await,
+                    None => client.write(path, stream).await,
+                },
+                ReaderWriterInternal::Fs(client) => match (mtime, set_fs_mtime) {
+                    (Some(mtime), true) => client.write_mtime(mtime, path, stream).await,
+                    _ => client.write(path, stream).await,
+                },
+            }
         }
+        .await
     }
 
     async fn delete(&self, path: &RelativePath) -> RSyncResult<()> {
