@@ -37,10 +37,19 @@ impl<T: TokenGenerator> StorageClient<T> {
         })
     }
 
-    async fn refresh_token(&self) -> StorageResult<AccessToken> {
+    async fn get_token(&self) -> Option<AccessToken> {
         let t = self.token.read().await;
+
         if t.is_valid() {
-            Ok(t.access_token())
+            Some(t.access_token())
+        } else {
+            None
+        }
+    }
+
+    async fn refresh_token(&self) -> StorageResult<AccessToken> {
+        if let Some(token) = self.get_token().await {
+            Ok(token)
         } else {
             let t = self
                 .token_generator
