@@ -69,6 +69,16 @@ pub mod credentials {
                 .map_err(super::super::Error::GcsTokenError)?)
         }
     }
+
+    pub mod metadata {
+        use crate::gcp::oauth2::token::GoogleMetadataServerCredentials;
+
+        pub async fn init() -> super::super::StorageResult<GoogleMetadataServerCredentials> {
+            Ok(GoogleMetadataServerCredentials::init()
+                   .await
+                .map_err(super::super::Error::GcsTokenError)?)
+        }
+    }
 }
 
 #[derive(Debug)]

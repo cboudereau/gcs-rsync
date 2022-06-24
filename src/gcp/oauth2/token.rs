@@ -7,6 +7,7 @@ use std::{
     fmt::{Debug, Display},
     path::Path,
 };
+use crate::Client;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Token {
@@ -54,23 +55,6 @@ impl Token {
     pub fn with_scope(mut self, scope: String) -> Self {
         self.scope = Some(scope);
         self
-    }
-}
-
-impl AuthorizedUserCredentials {
-    pub fn from(s: &str) -> TokenResult<Self> {
-        from_str(s)
-    }
-
-    pub async fn from_file<T>(file_path: T) -> TokenResult<Self>
-    where
-        T: AsRef<Path>,
-    {
-        from_file(file_path).await
-    }
-
-    pub async fn default() -> TokenResult<Self> {
-        default().await
     }
 }
 
@@ -143,6 +127,27 @@ impl TokenGenerator for ServiceAccountCredentials {
     }
 }
 
+#[async_trait::async_trait]
+impl TokenGenerator for GoogleMetadataServerCredentials {
+    async fn get(&self, client: &Client) -> TokenResult<Token> {
+        const DEFAULT_TOKEN_GCP_URI: &'static str = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
+
+        let token: DeserializedResponse<Token> = client
+            .client
+            .get(DEFAULT_TOKEN_GCP_URI)
+            .header("Metadata-Flavor","Google")
+            .send()
+            .await
+            .map_err(Error::HttpError)?
+            .json()
+            .await
+            .map_err(Error::HttpError)?;
+        token
+            .into_result()
+            .map_err(super::Error::unexpected_api_response::<Token>)
+    }
+}
+
 fn from_str<T>(str: &str) -> TokenResult<T>
 where
     T: serde::de::DeserializeOwned,
@@ -181,6 +186,53 @@ struct Claims<'a> {
     scope: &'a str,
 }
 
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct AuthorizedUserCredentials {
+    client_id: String,
+    client_secret: String,
+    refresh_token: String,
+    #[serde(default = "refresh_token")]
+    grant_type: String,
+}
+
+fn refresh_token() -> String {
+    "refresh_token".to_owned()
+}
+
+impl AuthorizedUserCredentials {
+    pub fn from(s: &str) -> TokenResult<Self> {
+        from_str(s)
+    }
+
+    pub async fn from_file<T>(file_path: T) -> TokenResult<Self>
+        where
+            T: AsRef<Path>,
+    {
+        from_file(file_path).await
+    }
+
+    pub async fn default() -> TokenResult<Self> {
+        default().await
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct ServiceAccountCredentials {
+    r#type: String,
+    project_id: String,
+    private_key_id: String,
+    private_key: String,
+    client_email: String,
+    client_id: String,
+    auth_uri: String,
+    token_uri: String,
+    auth_provider_x509_cert_url: String,
+    client_x509_cert_url: String,
+    #[serde(default)]
+    scope: Option<String>,
+}
+
 impl ServiceAccountCredentials {
     pub fn from(s: &str) -> TokenResult<Self> {
         from_str(s)
@@ -204,33 +256,17 @@ impl ServiceAccountCredentials {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct AuthorizedUserCredentials {
-    client_id: String,
-    client_secret: String,
-    refresh_token: String,
-    #[serde(default = "refresh_token")]
-    grant_type: String,
+pub struct GoogleMetadataServerCredentials {
 }
 
-fn refresh_token() -> String {
-    "refresh_token".to_owned()
+impl GoogleMetadataServerCredentials {
+
+    pub async fn init() -> TokenResult<Self> {
+        Ok(GoogleMetadataServerCredentials{})
+    }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct ServiceAccountCredentials {
-    r#type: String,
-    project_id: String,
-    private_key_id: String,
-    private_key: String,
-    client_email: String,
-    client_id: String,
-    auth_uri: String,
-    token_uri: String,
-    auth_provider_x509_cert_url: String,
-    client_x509_cert_url: String,
-    #[serde(default)]
-    scope: Option<String>,
-}
+
 #[cfg(test)]
 mod tests {
     use std::ops::Not;
