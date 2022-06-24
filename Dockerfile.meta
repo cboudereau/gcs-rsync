@@ -1,0 +1,11 @@
+FROM rust:alpine as builder
+RUN apk add --no-cache musl-dev pkgconfig openssl-dev
+COPY . /app 
+WORKDIR /app
+
+RUN cargo build --release --target=x86_64-unknown-linux-musl --example gcs-rsync-meta
+
+FROM alpine:latest
+COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/examples/gcs-rsync-meta /app/gcs-rsync-meta
+WORKDIR /app
+ENTRYPOINT [ "/app/gcs-rsync-meta" ]
