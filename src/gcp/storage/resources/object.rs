@@ -2,7 +2,7 @@ use std::{convert::TryInto, fmt::Display, str::FromStr};
 
 use crate::storage::{Error, StorageResult};
 
-#[derive(Debug, PartialEq, serde::Serialize, Clone)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum Projection {
     Full,
@@ -10,7 +10,7 @@ pub enum Projection {
 }
 
 /// See [GCS list API reference](https://cloud.google.com/storage/docs/json_api/v1/objects/list)
-#[derive(Debug, PartialEq, serde::Serialize, Default, Clone)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ObjectsListRequest {
     /// [Partial Response](https://cloud.google.com/storage/docs/json_api#partial-response)
@@ -26,12 +26,12 @@ pub struct ObjectsListRequest {
     pub versions: Option<bool>,
 }
 
-#[derive(Debug, PartialEq, serde::Serialize, Default, Clone)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ObjectMetadata {
     pub metadata: Metadata,
 }
-#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, Default, Clone)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Metadata {
     #[serde(
@@ -56,7 +56,7 @@ pub struct Objects {
     pub next_page_token: Option<String>,
 }
 
-#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Object {
     pub bucket: String,
@@ -94,7 +94,7 @@ fn percent_encode(input: &str) -> String {
 
 impl Object {
     pub fn gs_url(&self) -> GsUrl {
-        return format!("gs://{}/{}", &self.bucket, &self.name);
+        format!("gs://{}/{}", &self.bucket, &self.name)
     }
 
     /// References: `<https://cloud.google.com/storage/docs/naming-objects>`
@@ -133,7 +133,7 @@ impl Object {
     }
 }
 
-#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Bucket {
     name: String,
@@ -168,7 +168,7 @@ impl TryInto<Object> for PartialObject {
     }
 }
 
-#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, Default)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct PartialObject {
     pub bucket: Option<String>,
@@ -194,7 +194,7 @@ pub struct PartialObject {
     pub etag: Option<String>,
 }
 
-#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, Default)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct CRC32C {
     value: u32,
@@ -208,7 +208,7 @@ impl CRC32C {
         self.value
     }
 }
-#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Base64EncodedCRC32CError {
     Base64DecodeError(String),
     Base64ToU32BigEndianError(Vec<u8>),

@@ -2,7 +2,6 @@ use std::path::{Path, PathBuf};
 
 use futures::{StreamExt, TryStreamExt};
 use gcs_rsync::{
-    oauth2::token::AuthorizedUserCredentials,
     storage::{
         credentials::{self, authorizeduser},
         Object, ObjectClient, StorageResult,

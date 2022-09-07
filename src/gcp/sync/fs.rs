@@ -172,7 +172,7 @@ impl FsClient {
             .try_fold(
                 BufWriter::with_capacity(crate::DEFAULT_BUF_SIZE, file),
                 |mut buf_writer, data| async move {
-                    let _ = buf_writer.write_all(&data).await.map_err(|e| {
+                    buf_writer.write_all(&data).await.map_err(|e| {
                         RSyncError::fs_io_error("buffered write to file failed", file_path, e)
                     })?;
                     Ok(buf_writer)

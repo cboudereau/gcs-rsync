@@ -50,9 +50,9 @@ pub mod credentials {
         use crate::gcp::oauth2::token::AuthorizedUserCredentials;
 
         pub async fn default() -> super::super::StorageResult<AuthorizedUserCredentials> {
-            Ok(AuthorizedUserCredentials::default()
+            AuthorizedUserCredentials::default()
                 .await
-                .map_err(super::super::Error::GcsTokenError)?)
+                .map_err(super::super::Error::GcsTokenError)
         }
 
         pub fn from_str(str: &str) -> super::super::StorageResult<AuthorizedUserCredentials> {
@@ -65,9 +65,9 @@ pub mod credentials {
         where
             T: AsRef<std::path::Path>,
         {
-            Ok(AuthorizedUserCredentials::from_file(file_path)
+            AuthorizedUserCredentials::from_file(file_path)
                 .await
-                .map_err(super::super::Error::GcsTokenError)?)
+                .map_err(super::super::Error::GcsTokenError)
         }
     }
 

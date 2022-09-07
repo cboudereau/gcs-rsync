@@ -30,19 +30,19 @@ impl ReaderWriter {
         prefix: &str,
     ) -> RSyncResult<Self> {
         let client = GcsClient::new(token_generator, bucket, prefix).await?;
-        Ok(Self::new(ReaderWriterInternal::Gcs(client)))
+        Ok(Self::new(ReaderWriterInternal::Gcs(Box::new(client))))
     }
 
     pub fn fs(base_path: &Path) -> Self {
         let client = FsClient::new(base_path);
-        Self::new(ReaderWriterInternal::Fs(client))
+        Self::new(ReaderWriterInternal::Fs(Box::new(client)))
     }
 }
 
 //TODO: replace this with trait when async trait will be more stable with method returning Trait
 enum ReaderWriterInternal {
-    Gcs(GcsClient),
-    Fs(FsClient),
+    Gcs(Box<GcsClient>),
+    Fs(Box<FsClient>),
 }
 
 type Size = u64;
@@ -262,7 +262,7 @@ impl RSync {
         &self,
     ) -> impl Stream<Item = RSyncResult<impl Future<Output = RSyncResult<RMirrorStatus>> + '_>> + '_
     {
-        let r = self.dest.list().await.map(move |result| {
+        self.dest.list().await.map(move |result| {
             result.map(|path| async move {
                 if self.source.exists(&path).await?.not() {
                     self.dest.delete(&path).await?;
@@ -271,9 +271,7 @@ impl RSync {
                     Ok(RMirrorStatus::NotDeleted(path))
                 }
             })
-        });
-
-        r
+        })
     }
 
     /// Mirror synchronize source to destination by deleting extras (destination)

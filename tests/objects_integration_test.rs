@@ -2,7 +2,6 @@ use std::ops::Not;
 
 use futures::{StreamExt, TryStreamExt};
 use gcs_rsync::{
-    oauth2::token::AuthorizedUserCredentials,
     storage::{
         credentials, Metadata, Object, ObjectClient, ObjectMetadata, ObjectsListRequest,
         PartialObject, StorageResult,

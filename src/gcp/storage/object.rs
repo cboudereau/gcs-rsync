@@ -37,10 +37,10 @@ impl ObjectClient {
         o: &Object,
     ) -> StorageResult<impl Stream<Item = StorageResult<bytes::Bytes>>> {
         let url = o.url();
-        Ok(self
+        self
             .storage_client
             .get_as_stream(&url, &[("alt", "media")])
-            .await?)
+            .await
     }
 
     pub async fn upload<S>(&self, o: &Object, stream: S) -> StorageResult<()>

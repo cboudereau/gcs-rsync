@@ -64,7 +64,7 @@ pub trait TokenGenerator {
 }
 
 impl Debug for dyn TokenGenerator {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Ok(())
     }
 }
@@ -136,7 +136,7 @@ impl TokenGenerator for ServiceAccountCredentials {
 #[async_trait::async_trait]
 impl TokenGenerator for GoogleMetadataServerCredentials {
     async fn get(&self, client: &Client) -> TokenResult<Token> {
-        const DEFAULT_TOKEN_GCP_URI: &'static str = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
+        const DEFAULT_TOKEN_GCP_URI: &str = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
 
         let token: DeserializedResponse<Token> = client
             .client
@@ -192,7 +192,7 @@ struct Claims<'a> {
     scope: &'a str,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct AuthorizedUserCredentials {
     client_id: String,
     client_secret: String,
@@ -222,7 +222,7 @@ impl AuthorizedUserCredentials {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct ServiceAccountCredentials {
     r#type: String,
     project_id: String,
@@ -260,7 +260,7 @@ impl ServiceAccountCredentials {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct GoogleMetadataServerCredentials {}
 
 impl GoogleMetadataServerCredentials {
