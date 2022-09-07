@@ -1,11 +1,9 @@
 use std::ops::Not;
 
 use futures::{StreamExt, TryStreamExt};
-use gcs_rsync::{
-    storage::{
-        credentials, Metadata, Object, ObjectClient, ObjectMetadata, ObjectsListRequest,
-        PartialObject, StorageResult,
-    },
+use gcs_rsync::storage::{
+    credentials, Metadata, Object, ObjectClient, ObjectMetadata, ObjectsListRequest, PartialObject,
+    StorageResult,
 };
 
 mod config;

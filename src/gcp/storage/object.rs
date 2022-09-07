@@ -37,8 +37,7 @@ impl ObjectClient {
         o: &Object,
     ) -> StorageResult<impl Stream<Item = StorageResult<bytes::Bytes>>> {
         let url = o.url();
-        self
-            .storage_client
+        self.storage_client
             .get_as_stream(&url, &[("alt", "media")])
             .await
     }
