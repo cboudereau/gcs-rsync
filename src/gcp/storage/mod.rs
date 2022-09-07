@@ -44,6 +44,7 @@ pub mod credentials {
                 .map_err(super::super::Error::GcsTokenError)
         }
     }
+
     pub mod authorizeduser {
 
         use crate::gcp::oauth2::token::AuthorizedUserCredentials;
@@ -67,6 +68,15 @@ pub mod credentials {
             Ok(AuthorizedUserCredentials::from_file(file_path)
                 .await
                 .map_err(super::super::Error::GcsTokenError)?)
+        }
+    }
+
+    pub mod metadata {
+
+        use crate::oauth2::token::GoogleMetadataServerCredentials;
+
+        pub fn default() -> super::super::StorageResult<GoogleMetadataServerCredentials> {
+            GoogleMetadataServerCredentials::default().map_err(super::super::Error::GcsTokenError)
         }
     }
 }

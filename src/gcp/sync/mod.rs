@@ -11,22 +11,21 @@ use futures::{Future, Stream, StreamExt, TryStreamExt};
 use fs::FsClient;
 use gcs::GcsClient;
 
-pub struct ReaderWriter<T> {
-    inner: ReaderWriterInternal<T>,
+use crate::oauth2::token::TokenGenerator;
+
+pub struct ReaderWriter {
+    inner: ReaderWriterInternal,
 }
 
-pub type DefaultSource = ReaderWriter<crate::oauth2::token::AuthorizedUserCredentials>;
-pub type GcsSource<T> = ReaderWriter<T>;
+pub type Source = ReaderWriter;
 
-impl<T> ReaderWriter<T>
-where
-    T: crate::oauth2::token::TokenGenerator,
+impl ReaderWriter
 {
-    fn new(inner: ReaderWriterInternal<T>) -> Self {
+    fn new(inner: ReaderWriterInternal) -> Self {
         Self { inner }
     }
 
-    pub async fn gcs(token_generator: T, bucket: &str, prefix: &str) -> RSyncResult<Self> {
+    pub async fn gcs(token_generator: Box<dyn TokenGenerator>, bucket: &str, prefix: &str) -> RSyncResult<Self> {
         let client = GcsClient::new(token_generator, bucket, prefix).await?;
         Ok(Self::new(ReaderWriterInternal::Gcs(client)))
     }
@@ -38,16 +37,14 @@ where
 }
 
 //TODO: replace this with trait when async trait will be more stable with method returning Trait
-enum ReaderWriterInternal<T> {
-    Gcs(GcsClient<T>),
+enum ReaderWriterInternal {
+    Gcs(GcsClient),
     Fs(FsClient),
 }
 
 type Size = u64;
 
-impl<T> ReaderWriterInternal<T>
-where
-    T: crate::oauth2::token::TokenGenerator,
+impl ReaderWriterInternal
 {
     async fn list(
         &self,
@@ -129,18 +126,15 @@ where
     }
 }
 
-pub type DefaultRSync = RSync<crate::oauth2::token::AuthorizedUserCredentials>;
-pub struct RSync<T> {
-    source: ReaderWriterInternal<T>,
-    dest: ReaderWriterInternal<T>,
+pub struct RSync {
+    source: ReaderWriterInternal,
+    dest: ReaderWriterInternal,
     restore_fs_mtime: bool,
 }
 
-impl<T> RSync<T>
-where
-    T: crate::oauth2::token::TokenGenerator + 'static,
+impl RSync
 {
-    pub fn new(source: ReaderWriter<T>, dest: ReaderWriter<T>) -> Self {
+    pub fn new(source: ReaderWriter, dest: ReaderWriter) -> Self {
         Self {
             source: source.inner,
             dest: dest.inner,

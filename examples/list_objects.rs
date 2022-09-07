@@ -7,7 +7,7 @@ async fn main() -> StorageResult<()> {
     let bucket = args[1].as_str();
     let prefix = args[2].to_owned();
 
-    let auc = credentials::authorizeduser::default().await?;
+    let auc = Box::new(credentials::authorizeduser::default().await?);
     let object_client = ObjectClient::new(auc).await?;
 
     let objects_list_request = ObjectsListRequest {

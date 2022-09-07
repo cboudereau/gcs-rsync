@@ -8,22 +8,17 @@ use super::{
     Bucket, StorageResult, {Object, ObjectsListRequest, PartialObject},
 };
 
-pub struct ObjectClient<T> {
-    storage_client: StorageClient<T>,
+pub struct ObjectClient {
+    storage_client: StorageClient,
 }
 
-impl<T: TokenGenerator> ObjectClient<T> {
-    pub async fn new(token_generator: T) -> StorageResult<Self> {
+impl ObjectClient {
+    pub async fn new(token_generator: Box<dyn TokenGenerator>) -> StorageResult<Self> {
         Ok(Self {
             storage_client: StorageClient::new(token_generator).await?,
         })
     }
-}
 
-impl<T> ObjectClient<T>
-where
-    T: TokenGenerator,
-{
     pub async fn get(&self, o: &Object, fields: &str) -> StorageResult<PartialObject> {
         let url = o.url();
         self.storage_client
