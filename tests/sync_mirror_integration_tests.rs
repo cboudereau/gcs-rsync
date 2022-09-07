@@ -8,7 +8,7 @@ use gcs_rsync::{
         Object, ObjectClient, StorageResult,
     },
     sync::{
-        DefaultRSync, DefaultSource, RMirrorStatus, RSync, RSyncStatus, ReaderWriter, RelativePath,
+        Source, RMirrorStatus, RSync, RSyncStatus, ReaderWriter, RelativePath,
     },
 };
 use tokio::io::AsyncWriteExt;
@@ -80,7 +80,7 @@ async fn delete_files(file_names: &[PathBuf]) {
         .await;
 }
 
-async fn sync(fs_client: &DefaultRSync) -> Vec<RSyncStatus> {
+async fn sync(fs_client: &RSync) -> Vec<RSyncStatus> {
     let mut actual = fs_client
         .sync()
         .await
@@ -92,7 +92,7 @@ async fn sync(fs_client: &DefaultRSync) -> Vec<RSyncStatus> {
     actual
 }
 
-async fn mirror(fs_client: &DefaultRSync) -> Vec<RMirrorStatus> {
+async fn mirror(fs_client: &RSync) -> Vec<RMirrorStatus> {
     let mut actual = fs_client
         .mirror()
         .await
@@ -147,7 +147,7 @@ async fn test_fs_to_gcs_sync_and_mirror() {
 #[tokio::test]
 async fn test_sync_and_mirror_crc32c() {
     async fn assert_delete_ok(
-        object_client: &ObjectClient<AuthorizedUserCredentials>,
+        object_client: &ObjectClient,
         object: &Object,
     ) {
         let delete_result = object_client.delete(object).await;
@@ -160,7 +160,7 @@ async fn test_sync_and_mirror_crc32c() {
     }
 
     async fn upload_bytes(
-        object_client: &ObjectClient<AuthorizedUserCredentials>,
+        object_client: &ObjectClient,
         object: &Object,
         content: &str,
     ) -> StorageResult<()> {
@@ -170,7 +170,7 @@ async fn test_sync_and_mirror_crc32c() {
     }
 
     async fn assert_upload_bytes(
-        object_client: &ObjectClient<AuthorizedUserCredentials>,
+        object_client: &ObjectClient,
         object: &Object,
         content: &str,
     ) {
@@ -190,11 +190,11 @@ async fn test_sync_and_mirror_crc32c() {
 
     let object = gcs_src.object("hello.txt");
 
-    let object_client = ObjectClient::new(gcs_src.token()).await.unwrap();
+    let object_client = ObjectClient::new(Box::new(gcs_src.token())).await.unwrap();
     assert_upload_bytes(&object_client, &object, "hello").await;
 
-    let src = DefaultSource::gcs(
-        credentials::authorizeduser::default().await.unwrap(),
+    let src = Source::gcs(
+        Box::new(credentials::authorizeduser::default().await.unwrap()),
         &bucket,
         prefix.to_str().unwrap(),
     )
@@ -203,7 +203,7 @@ async fn test_sync_and_mirror_crc32c() {
 
     let bucket = gcs_dst.bucket();
     let prefix = gcs_dst.prefix();
-    let dest = DefaultSource::gcs(gcs_dst.token(), &bucket, prefix.to_str().unwrap())
+    let dest = Source::gcs(Box::new(gcs_dst.token()), &bucket, prefix.to_str().unwrap())
         .await
         .unwrap();
 
@@ -236,12 +236,12 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
 
     setup_files(&file_names[..], "Hello World").await;
 
-    async fn generate_gcs(test_config: GcsTestConfig) -> DefaultSource {
+    async fn generate_gcs(test_config: GcsTestConfig) -> Source {
         let bucket = test_config.bucket();
         let prefix = test_config.prefix();
 
-        let gcs_dest = DefaultSource::gcs(
-            test_config.token(),
+        let gcs_dest = Source::gcs(
+            Box::new(test_config.token()),
             bucket.as_str(),
             prefix.to_str().unwrap(),
         )
@@ -253,7 +253,7 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
     let gcs_dst_t = GcsTestConfig::from_env().await;
 
     let gcs_source_replica = async {
-        let token_generator = authorizeduser::default().await.unwrap();
+        let token_generator = Box::new(authorizeduser::default().await.unwrap());
         let bucket = gcs_dst_t.bucket();
         let prefix = gcs_dst_t.prefix();
         ReaderWriter::gcs(token_generator, bucket.as_str(), prefix.to_str().unwrap())
@@ -263,7 +263,7 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
     .await;
 
     let gcs_source_replica2 = async {
-        let token_generator = authorizeduser::default().await.unwrap();
+        let token_generator = Box::new(authorizeduser::default().await.unwrap());
         let bucket = gcs_dst_t.bucket();
         let prefix = gcs_dst_t.prefix();
         ReaderWriter::gcs(token_generator, bucket.as_str(), prefix.to_str().unwrap())
@@ -276,14 +276,14 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
 
     let gcs_dest = generate_gcs(gcs_dst_t).await;
 
-    let fs_source = DefaultSource::fs(src_t.base_path.as_path());
-    let fs_source_replica = DefaultSource::fs(src_t.base_path.as_path());
+    let fs_source = Source::fs(src_t.base_path.as_path());
+    let fs_source_replica = Source::fs(src_t.base_path.as_path());
 
     let fs_replica_t = FsTestConfig::new();
-    let fs_dest_replica = DefaultSource::fs(fs_replica_t.base_path.as_path());
+    let fs_dest_replica = Source::fs(fs_replica_t.base_path.as_path());
 
     let fs_replica_t2 = FsTestConfig::new();
-    let fs_dest_replica2 = DefaultSource::fs(fs_replica_t2.base_path.as_path());
+    let fs_dest_replica2 = Source::fs(fs_replica_t2.base_path.as_path());
 
     let rsync_fs_to_gcs = RSync::new(fs_source, gcs_dest).with_restore_fs_mtime(set_fs_mtime);
     let rsync_gcs_to_gcs_replica =
