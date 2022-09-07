@@ -230,15 +230,13 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
         let bucket = test_config.bucket();
         let prefix = test_config.prefix();
 
-        let gcs_dest = Source::gcs(
+        Source::gcs(
             Box::new(test_config.token()),
             bucket.as_str(),
             prefix.to_str().unwrap(),
         )
         .await
-        .unwrap();
-
-        gcs_dest
+        .unwrap()
     }
     let gcs_dst_t = GcsTestConfig::from_env().await;
 
