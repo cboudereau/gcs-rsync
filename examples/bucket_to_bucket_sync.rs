@@ -15,6 +15,7 @@ async fn main() -> RSyncResult<()> {
         .await
         .unwrap();
 
+    let token_generator = Box::new(authorizeduser::default().await.unwrap());
     let dest_prefix = format!("{}_dest", test_prefix);
     let dest = ReaderWriter::gcs(token_generator, bucket, &dest_prefix)
         .await
