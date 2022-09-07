@@ -141,7 +141,7 @@ impl TokenGenerator for GoogleMetadataServerCredentials {
         let token: DeserializedResponse<Token> = client
             .client
             .get(DEFAULT_TOKEN_GCP_URI)
-            .header("Metadata-Flavor","Google")
+            .header("Metadata-Flavor", "Google")
             .send()
             .await
             .map_err(Error::HttpError)?
@@ -261,13 +261,11 @@ impl ServiceAccountCredentials {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct GoogleMetadataServerCredentials {
-}
+pub struct GoogleMetadataServerCredentials {}
 
 impl GoogleMetadataServerCredentials {
-
     pub fn default() -> TokenResult<Self> {
-        Ok(GoogleMetadataServerCredentials{})
+        Ok(GoogleMetadataServerCredentials {})
     }
 }
 

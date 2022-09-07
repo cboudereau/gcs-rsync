@@ -19,13 +19,16 @@ pub struct ReaderWriter {
 
 pub type Source = ReaderWriter;
 
-impl ReaderWriter
-{
+impl ReaderWriter {
     fn new(inner: ReaderWriterInternal) -> Self {
         Self { inner }
     }
 
-    pub async fn gcs(token_generator: Box<dyn TokenGenerator>, bucket: &str, prefix: &str) -> RSyncResult<Self> {
+    pub async fn gcs(
+        token_generator: Box<dyn TokenGenerator>,
+        bucket: &str,
+        prefix: &str,
+    ) -> RSyncResult<Self> {
         let client = GcsClient::new(token_generator, bucket, prefix).await?;
         Ok(Self::new(ReaderWriterInternal::Gcs(client)))
     }
@@ -44,8 +47,7 @@ enum ReaderWriterInternal {
 
 type Size = u64;
 
-impl ReaderWriterInternal
-{
+impl ReaderWriterInternal {
     async fn list(
         &self,
     ) -> Either<
@@ -132,8 +134,7 @@ pub struct RSync {
     restore_fs_mtime: bool,
 }
 
-impl RSync
-{
+impl RSync {
     pub fn new(source: ReaderWriter, dest: ReaderWriter) -> Self {
         Self {
             source: source.inner,

@@ -7,9 +7,7 @@ use gcs_rsync::{
         credentials::{self, authorizeduser},
         Object, ObjectClient, StorageResult,
     },
-    sync::{
-        Source, RMirrorStatus, RSync, RSyncStatus, ReaderWriter, RelativePath,
-    },
+    sync::{RMirrorStatus, RSync, RSyncStatus, ReaderWriter, RelativePath, Source},
 };
 use tokio::io::AsyncWriteExt;
 
@@ -146,10 +144,7 @@ async fn test_fs_to_gcs_sync_and_mirror() {
 
 #[tokio::test]
 async fn test_sync_and_mirror_crc32c() {
-    async fn assert_delete_ok(
-        object_client: &ObjectClient,
-        object: &Object,
-    ) {
+    async fn assert_delete_ok(object_client: &ObjectClient, object: &Object) {
         let delete_result = object_client.delete(object).await;
         assert!(
             delete_result.is_ok(),
@@ -169,11 +164,7 @@ async fn test_sync_and_mirror_crc32c() {
         object_client.upload(object, stream).await
     }
 
-    async fn assert_upload_bytes(
-        object_client: &ObjectClient,
-        object: &Object,
-        content: &str,
-    ) {
+    async fn assert_upload_bytes(object_client: &ObjectClient, object: &Object, content: &str) {
         let upload_result = upload_bytes(object_client, object, content).await;
         assert!(
             upload_result.is_ok(),

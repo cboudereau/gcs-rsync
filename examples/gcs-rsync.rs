@@ -2,8 +2,12 @@ use std::{path::Path, str::FromStr};
 
 use futures::{StreamExt, TryStreamExt};
 use gcs_rsync::{
-    storage::{credentials::{authorizeduser, metadata}, Object},
-    sync::{Source, RSync, RSyncError, RSyncResult}, oauth2::token::TokenGenerator,
+    oauth2::token::TokenGenerator,
+    storage::{
+        credentials::{authorizeduser, metadata},
+        Object,
+    },
+    sync::{RSync, RSyncError, RSyncResult, Source},
 };
 
 use structopt::StructOpt;
@@ -35,18 +39,22 @@ struct Opt {
     dest: String,
 }
 
-async fn get_source(path: &str, is_dest: bool, use_metadata_token_api: bool) -> RSyncResult<Source> {
+async fn get_source(
+    path: &str,
+    is_dest: bool,
+    use_metadata_token_api: bool,
+) -> RSyncResult<Source> {
     match Object::from_str(path).ok() {
         Some(o) => {
-            let token_generator: Box<dyn TokenGenerator> = 
-                if use_metadata_token_api {
-                    Box::new(metadata::default()
-                    .map_err(RSyncError::StorageError)?)
-                } else {
-                    Box::new(authorizeduser::default()
-                    .await
-                    .map_err(RSyncError::StorageError)?)
-                };
+            let token_generator: Box<dyn TokenGenerator> = if use_metadata_token_api {
+                Box::new(metadata::default().map_err(RSyncError::StorageError)?)
+            } else {
+                Box::new(
+                    authorizeduser::default()
+                        .await
+                        .map_err(RSyncError::StorageError)?,
+                )
+            };
             Source::gcs(token_generator, o.bucket.as_str(), o.name.as_str()).await
         }
         None => {

@@ -75,9 +75,12 @@ impl ObjectPrefix {
 
 type Size = u64;
 
-impl GcsClient
-{
-    pub(super) async fn new(token_generator: Box<dyn TokenGenerator>, bucket: &str, prefix: &str) -> RSyncResult<Self> {
+impl GcsClient {
+    pub(super) async fn new(
+        token_generator: Box<dyn TokenGenerator>,
+        bucket: &str,
+        prefix: &str,
+    ) -> RSyncResult<Self> {
         let object_client = ObjectClient::new(token_generator)
             .await
             .map_err(RSyncError::StorageError)?;
