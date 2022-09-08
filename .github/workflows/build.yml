@@ -62,7 +62,7 @@ jobs:
           override: true
 
       - name: Run cargo-tarpaulin
-        uses: actions-rs/tarpaulin@v0.1
+        uses: actions-rs/tarpaulin@v0.2
         with:
           version: '0.15.0'
           args: '-- --test-threads 1'
