@@ -19,7 +19,7 @@
 //!
 //! #[tokio::main]
 //! async fn main() -> RSyncResult<()> {
-//!     let token_generator = authorizeduser::default().await.unwrap();
+//!     let token_generator = Box::new(authorizeduser::default().await.unwrap());
 //!
 //!     let home_dir = ".";
 //!     let test_prefix = "bucket_prefix_to_sync";
