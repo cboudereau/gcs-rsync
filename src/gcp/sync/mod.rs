@@ -11,44 +11,43 @@ use futures::{Future, Stream, StreamExt, TryStreamExt};
 use fs::FsClient;
 use gcs::GcsClient;
 
-pub struct ReaderWriter<T> {
-    inner: ReaderWriterInternal<T>,
+use crate::oauth2::token::TokenGenerator;
+
+pub struct ReaderWriter {
+    inner: ReaderWriterInternal,
 }
 
-pub type DefaultSource = ReaderWriter<crate::oauth2::token::AuthorizedUserCredentials>;
-pub type GcsSource<T> = ReaderWriter<T>;
+pub type Source = ReaderWriter;
 
-impl<T> ReaderWriter<T>
-where
-    T: crate::oauth2::token::TokenGenerator,
-{
-    fn new(inner: ReaderWriterInternal<T>) -> Self {
+impl ReaderWriter {
+    fn new(inner: ReaderWriterInternal) -> Self {
         Self { inner }
     }
 
-    pub async fn gcs(token_generator: T, bucket: &str, prefix: &str) -> RSyncResult<Self> {
+    pub async fn gcs(
+        token_generator: Box<dyn TokenGenerator>,
+        bucket: &str,
+        prefix: &str,
+    ) -> RSyncResult<Self> {
         let client = GcsClient::new(token_generator, bucket, prefix).await?;
-        Ok(Self::new(ReaderWriterInternal::Gcs(client)))
+        Ok(Self::new(ReaderWriterInternal::Gcs(Box::new(client))))
     }
 
     pub fn fs(base_path: &Path) -> Self {
         let client = FsClient::new(base_path);
-        Self::new(ReaderWriterInternal::Fs(client))
+        Self::new(ReaderWriterInternal::Fs(Box::new(client)))
     }
 }
 
 //TODO: replace this with trait when async trait will be more stable with method returning Trait
-enum ReaderWriterInternal<T> {
-    Gcs(GcsClient<T>),
-    Fs(FsClient),
+enum ReaderWriterInternal {
+    Gcs(Box<GcsClient>),
+    Fs(Box<FsClient>),
 }
 
 type Size = u64;
 
-impl<T> ReaderWriterInternal<T>
-where
-    T: crate::oauth2::token::TokenGenerator,
-{
+impl ReaderWriterInternal {
     async fn list(
         &self,
     ) -> Either<
@@ -129,18 +128,14 @@ where
     }
 }
 
-pub type DefaultRSync = RSync<crate::oauth2::token::AuthorizedUserCredentials>;
-pub struct RSync<T> {
-    source: ReaderWriterInternal<T>,
-    dest: ReaderWriterInternal<T>,
+pub struct RSync {
+    source: ReaderWriterInternal,
+    dest: ReaderWriterInternal,
     restore_fs_mtime: bool,
 }
 
-impl<T> RSync<T>
-where
-    T: crate::oauth2::token::TokenGenerator + 'static,
-{
-    pub fn new(source: ReaderWriter<T>, dest: ReaderWriter<T>) -> Self {
+impl RSync {
+    pub fn new(source: ReaderWriter, dest: ReaderWriter) -> Self {
         Self {
             source: source.inner,
             dest: dest.inner,
@@ -267,7 +262,7 @@ where
         &self,
     ) -> impl Stream<Item = RSyncResult<impl Future<Output = RSyncResult<RMirrorStatus>> + '_>> + '_
     {
-        let r = self.dest.list().await.map(move |result| {
+        self.dest.list().await.map(move |result| {
             result.map(|path| async move {
                 if self.source.exists(&path).await?.not() {
                     self.dest.delete(&path).await?;
@@ -276,9 +271,7 @@ where
                     Ok(RMirrorStatus::NotDeleted(path))
                 }
             })
-        });
-
-        r
+        })
     }
 
     /// Mirror synchronize source to destination by deleting extras (destination)

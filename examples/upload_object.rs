@@ -10,7 +10,7 @@ async fn main() -> StorageResult<()> {
     let prefix = args[2].to_owned();
     let file_path = args[3].to_owned();
 
-    let auc = credentials::authorizeduser::default().await?;
+    let auc = Box::new(credentials::authorizeduser::default().await?);
     let object_client = ObjectClient::new(auc).await?;
 
     let file_path = Path::new(&file_path);

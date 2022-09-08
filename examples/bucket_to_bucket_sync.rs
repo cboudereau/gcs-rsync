@@ -6,7 +6,7 @@ use gcs_rsync::{
 
 #[tokio::main]
 async fn main() -> RSyncResult<()> {
-    let token_generator = authorizeduser::default().await.unwrap();
+    let token_generator = Box::new(authorizeduser::default().await.unwrap());
 
     let test_prefix = env!("EXAMPLE_PREFIX");
     let bucket = env!("EXAMPLE_BUCKET");
@@ -14,8 +14,8 @@ async fn main() -> RSyncResult<()> {
     let source = ReaderWriter::gcs(token_generator, bucket, test_prefix)
         .await
         .unwrap();
-    let token_generator = authorizeduser::default().await.unwrap();
 
+    let token_generator = Box::new(authorizeduser::default().await.unwrap());
     let dest_prefix = format!("{}_dest", test_prefix);
     let dest = ReaderWriter::gcs(token_generator, bucket, &dest_prefix)
         .await

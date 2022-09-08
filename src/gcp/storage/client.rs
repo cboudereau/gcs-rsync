@@ -12,9 +12,9 @@ use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::RwLock;
 
 #[derive(Debug)]
-pub(super) struct StorageClient<T> {
+pub(super) struct StorageClient {
     client: Client,
-    token_generator: T,
+    token_generator: Box<dyn TokenGenerator>,
     token: RwLock<Token>,
 }
 
@@ -23,8 +23,8 @@ const MT_END_SEPARATOR: &[u8] = b"\n--gcs-storage--";
 const MT_CONTENT_TYPE: &[u8] = b"Content-Type: application/octet-stream";
 const MT_METADATA_TYPE: &[u8] = b"Content-Type: application/json; charset=utf-8\n\n";
 
-impl<T: TokenGenerator> StorageClient<T> {
-    pub async fn new(token_generator: T) -> StorageResult<Self> {
+impl StorageClient {
+    pub async fn new(token_generator: Box<dyn TokenGenerator>) -> StorageResult<Self> {
         let client = Client::default();
         let token = token_generator
             .get(&client)

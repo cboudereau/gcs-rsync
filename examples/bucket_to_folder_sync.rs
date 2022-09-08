@@ -8,7 +8,7 @@ use gcs_rsync::{
 
 #[tokio::main]
 async fn main() -> RSyncResult<()> {
-    let token_generator = authorizeduser::default().await.unwrap();
+    let token_generator = Box::new(authorizeduser::default().await.unwrap());
 
     let home_dir = env!("HOME");
     let test_prefix = env!("EXAMPLE_PREFIX");

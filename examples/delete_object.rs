@@ -7,7 +7,7 @@ async fn main() -> StorageResult<()> {
     let name = args[2].as_str();
     let object = Object::new(bucket, name)?;
 
-    let auc = credentials::authorizeduser::default().await?;
+    let auc = Box::new(credentials::authorizeduser::default().await?);
     let object_client = ObjectClient::new(auc).await?;
 
     object_client.delete(&object).await?;

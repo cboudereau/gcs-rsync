@@ -7,10 +7,12 @@ async fn main() -> StorageResult<()> {
     let bucket = args[1].as_str();
     let prefix = args[2].to_owned();
 
-    let auc = credentials::serviceaccount::default(
-        "https://www.googleapis.com/auth/devstorage.full_control",
-    )
-    .await?;
+    let auc = Box::new(
+        credentials::serviceaccount::default(
+            "https://www.googleapis.com/auth/devstorage.full_control",
+        )
+        .await?,
+    );
     let object_client = ObjectClient::new(auc).await?;
 
     let objects_list_request = ObjectsListRequest {

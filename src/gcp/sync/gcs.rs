@@ -10,8 +10,8 @@ use crate::{
     storage::{Object, ObjectClient, ObjectsListRequest, PartialObject},
 };
 
-pub(super) struct GcsClient<T> {
-    client: ObjectClient<T>,
+pub(super) struct GcsClient {
+    client: ObjectClient,
     object_prefix: ObjectPrefix,
 }
 
@@ -75,11 +75,12 @@ impl ObjectPrefix {
 
 type Size = u64;
 
-impl<T> GcsClient<T>
-where
-    T: TokenGenerator,
-{
-    pub(super) async fn new(token_generator: T, bucket: &str, prefix: &str) -> RSyncResult<Self> {
+impl GcsClient {
+    pub(super) async fn new(
+        token_generator: Box<dyn TokenGenerator>,
+        bucket: &str,
+        prefix: &str,
+    ) -> RSyncResult<Self> {
         let object_client = ObjectClient::new(token_generator)
             .await
             .map_err(RSyncError::StorageError)?;

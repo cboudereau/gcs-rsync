@@ -14,7 +14,7 @@ async fn main() -> StorageResult<()> {
     let name = args[2].as_str();
     let output_path = args[3].to_owned();
 
-    let auc = credentials::authorizeduser::default().await?;
+    let auc = Box::new(credentials::authorizeduser::default().await?);
     let object_client = ObjectClient::new(auc).await?;
 
     let file_name = Path::new(&name).file_name().unwrap().to_string_lossy();

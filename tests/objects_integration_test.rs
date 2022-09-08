@@ -1,12 +1,9 @@
 use std::ops::Not;
 
 use futures::{StreamExt, TryStreamExt};
-use gcs_rsync::{
-    oauth2::token::AuthorizedUserCredentials,
-    storage::{
-        credentials, Metadata, Object, ObjectClient, ObjectMetadata, ObjectsListRequest,
-        PartialObject, StorageResult,
-    },
+use gcs_rsync::storage::{
+    credentials, Metadata, Object, ObjectClient, ObjectMetadata, ObjectsListRequest, PartialObject,
+    StorageResult,
 };
 
 mod config;
@@ -29,10 +26,7 @@ async fn test_test_config() {
     assert!(t.bucket().is_empty().not(), "bucket should not be empty");
 }
 
-async fn assert_delete_err(
-    object_client: &ObjectClient<AuthorizedUserCredentials>,
-    object: &Object,
-) {
+async fn assert_delete_err(object_client: &ObjectClient, object: &Object) {
     let delete_result = object_client.delete(object).await;
     assert!(
         delete_result.is_err(),
@@ -42,10 +36,7 @@ async fn assert_delete_err(
     );
 }
 
-async fn assert_delete_ok(
-    object_client: &ObjectClient<AuthorizedUserCredentials>,
-    object: &Object,
-) {
+async fn assert_delete_ok(object_client: &ObjectClient, object: &Object) {
     let delete_result = object_client.delete(object).await;
     assert!(
         delete_result.is_ok(),
@@ -56,7 +47,7 @@ async fn assert_delete_ok(
 }
 
 async fn upload_bytes(
-    object_client: &ObjectClient<AuthorizedUserCredentials>,
+    object_client: &ObjectClient,
     object: &Object,
     content: &str,
 ) -> StorageResult<()> {
@@ -65,11 +56,7 @@ async fn upload_bytes(
     object_client.upload(object, stream).await
 }
 
-async fn assert_upload_bytes(
-    object_client: &ObjectClient<AuthorizedUserCredentials>,
-    object: &Object,
-    content: &str,
-) {
+async fn assert_upload_bytes(object_client: &ObjectClient, object: &Object, content: &str) {
     let upload_result = upload_bytes(object_client, object, content).await;
     assert!(
         upload_result.is_ok(),
@@ -79,11 +66,7 @@ async fn assert_upload_bytes(
     );
 }
 
-async fn assert_download_bytes(
-    object_client: &ObjectClient<AuthorizedUserCredentials>,
-    object: &Object,
-    expected: &str,
-) {
+async fn assert_download_bytes(object_client: &ObjectClient, object: &Object, expected: &str) {
     let bytes = futures::stream::once(object_client.download(object))
         .try_flatten()
         .try_fold(Vec::new(), |mut bytes, buffer| {
@@ -102,7 +85,9 @@ async fn assert_download_bytes(
 async fn test_upload_multipart() {
     let test_config = GcsTestConfig::from_env().await;
     let object = test_config.object("with/path/object_mutlipart.txt");
-    let object_client = ObjectClient::new(test_config.token()).await.unwrap();
+    let object_client = ObjectClient::new(Box::new(test_config.token()))
+        .await
+        .unwrap();
 
     let content = b"test multipart";
 
@@ -131,7 +116,9 @@ async fn test_upload_multipart() {
 async fn test_delete_upload_download_delete() {
     let test_config = GcsTestConfig::from_env().await;
     let object = test_config.object("object.txt");
-    let object_client = ObjectClient::new(test_config.token()).await.unwrap();
+    let object_client = ObjectClient::new(Box::new(test_config.token()))
+        .await
+        .unwrap();
 
     let content = "hello";
     assert_delete_err(&object_client, &object).await;
@@ -144,7 +131,9 @@ async fn test_delete_upload_download_delete() {
 async fn test_get_object_ok() {
     let test_config = GcsTestConfig::from_env().await;
     let object = test_config.object("object.txt");
-    let object_client = ObjectClient::new(test_config.token()).await.unwrap();
+    let object_client = ObjectClient::new(Box::new(test_config.token()))
+        .await
+        .unwrap();
 
     let content = "hello";
     assert_delete_err(&object_client, &object).await;
@@ -162,7 +151,9 @@ async fn test_get_object_ok() {
 async fn test_get_object_size() {
     let test_config = GcsTestConfig::from_env().await;
     let object = test_config.object("object.txt");
-    let object_client = ObjectClient::new(test_config.token()).await.unwrap();
+    let object_client = ObjectClient::new(Box::new(test_config.token()))
+        .await
+        .unwrap();
 
     let content = "hello";
     assert_delete_err(&object_client, &object).await;
@@ -178,7 +169,9 @@ async fn test_get_object_size() {
 async fn test_get_object_not_found() {
     let test_config = GcsTestConfig::from_env().await;
     let object = test_config.object("object.txt");
-    let object_client = ObjectClient::new(test_config.token()).await.unwrap();
+    let object_client = ObjectClient::new(Box::new(test_config.token()))
+        .await
+        .unwrap();
 
     let err = object_client
         .get(&object, "name,selfLink")
@@ -191,7 +184,9 @@ async fn test_get_object_not_found() {
 #[tokio::test]
 async fn test_upload_with_detailed_error() {
     let test_config = GcsTestConfig::from_env().await;
-    let object_client = ObjectClient::new(test_config.token()).await.unwrap();
+    let object_client = ObjectClient::new(Box::new(test_config.token()))
+        .await
+        .unwrap();
     let object = Object::new("the_bad_bucket", "name").unwrap();
 
     let err = upload_bytes(&object_client, &object, "").await.unwrap_err();
@@ -210,7 +205,9 @@ async fn test_api_list_objects() {
         .map(|i| test_config.object(format!("object_{}", i).as_str()))
         .collect::<Vec<_>>();
 
-    let object_client = ObjectClient::new(test_config.token()).await.unwrap();
+    let object_client = ObjectClient::new(Box::new(test_config.token()))
+        .await
+        .unwrap();
     futures::stream::iter(test_objects.iter())
         .for_each_concurrent(config::default::CONCURRENCY_LEVEL, |object| {
             assert_upload_bytes(&object_client, object, "hello")
@@ -247,7 +244,9 @@ async fn test_crc32c_object() {
     let bucket = test_config.bucket();
     let prefix = test_config.list_prefix();
     let test_object = &test_config.object("test_crc32c");
-    let object_client = ObjectClient::new(test_config.token()).await.unwrap();
+    let object_client = ObjectClient::new(Box::new(test_config.token()))
+        .await
+        .unwrap();
     assert_upload_bytes(&object_client, test_object, "hello world!").await;
 
     let objects_list_request = ObjectsListRequest {
@@ -293,7 +292,7 @@ fn assert_not_found_response(err: gcs_rsync::storage::Error) {
 
 #[tokio::test]
 async fn test_api_list_objects_not_found_error() {
-    let auc = credentials::authorizeduser::default().await.unwrap();
+    let auc = Box::new(credentials::authorizeduser::default().await.unwrap());
 
     let object_client = ObjectClient::new(auc).await.unwrap();
 
