@@ -25,6 +25,7 @@ base64           = { version = "0.13", default-features = false }
 tokio-util       = "0.7"
 crc32c           = "0.6"
 filetime         = "0.2"
+urlencoding      = "2.1"
 
 [dev-dependencies]
 tokio        = { version = "1.12", default-features = false, features = ["full"] }
