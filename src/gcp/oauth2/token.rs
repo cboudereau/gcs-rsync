@@ -137,11 +137,14 @@ impl TokenGenerator for ServiceAccountCredentials {
 #[async_trait::async_trait]
 impl TokenGenerator for GoogleMetadataServerCredentials {
     async fn get(&self, client: &Client) -> TokenResult<Token> {
-
         const DEFAULT_TOKEN_GCP_URI: &str = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
         let uri = match self.scope {
             None => DEFAULT_TOKEN_GCP_URI.to_string(),
-            Some(ref scope) => format!("{}?{}", DEFAULT_TOKEN_GCP_URI, encode(format!("scopes={}", scope).as_str()))
+            Some(ref scope) => format!(
+                "{}?{}",
+                DEFAULT_TOKEN_GCP_URI,
+                encode(format!("scopes={}", scope).as_str())
+            ),
         };
 
         let token: DeserializedResponse<Token> = client
