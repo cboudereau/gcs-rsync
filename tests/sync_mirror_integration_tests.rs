@@ -2,10 +2,8 @@ use std::path::{Path, PathBuf};
 
 use futures::{StreamExt, TryStreamExt};
 use gcs_rsync::{
-    storage::{
-        credentials::{self, authorizeduser},
-        Object, ObjectClient, StorageResult,
-    },
+    oauth2::token::ServiceAccountCredentials,
+    storage::{credentials, Object, ObjectClient, StorageResult},
     sync::{RMirrorStatus, RSync, RSyncStatus, ReaderWriter, RelativePath, Source},
 };
 use tokio::io::AsyncWriteExt;
@@ -42,6 +40,14 @@ impl Drop for FsTestConfig {
         let path = self.base_path.as_path();
         std::fs::remove_dir_all(path).unwrap();
     }
+}
+
+async fn get_service_account() -> ServiceAccountCredentials {
+    let path = env!("TEST_SERVICE_ACCOUNT");
+    ServiceAccountCredentials::from_file(path)
+        .await
+        .unwrap()
+        .with_scope("https://www.googleapis.com/auth/devstorage.full_control")
 }
 
 async fn write_to_file(path: &Path, content: &str) {
@@ -241,7 +247,7 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
     let gcs_dst_t = GcsTestConfig::from_env().await;
 
     let gcs_source_replica = async {
-        let token_generator = Box::new(authorizeduser::default().await.unwrap());
+        let token_generator = Box::new(get_service_account().await);
         let bucket = gcs_dst_t.bucket();
         let prefix = gcs_dst_t.prefix();
         ReaderWriter::gcs(token_generator, bucket.as_str(), prefix.to_str().unwrap())
@@ -251,7 +257,7 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
     .await;
 
     let gcs_source_replica2 = async {
-        let token_generator = Box::new(authorizeduser::default().await.unwrap());
+        let token_generator = Box::new(get_service_account().await);
         let bucket = gcs_dst_t.bucket();
         let prefix = gcs_dst_t.prefix();
         ReaderWriter::gcs(token_generator, bucket.as_str(), prefix.to_str().unwrap())
