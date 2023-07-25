@@ -1,9 +1,6 @@
 use std::path::PathBuf;
 
-use gcs_rsync::{
-    oauth2::token::ServiceAccountCredentials,
-    storage::Object,
-};
+use gcs_rsync::{oauth2::token::ServiceAccountCredentials, storage::Object};
 
 pub struct GcsTestConfig {
     bucket: String,
