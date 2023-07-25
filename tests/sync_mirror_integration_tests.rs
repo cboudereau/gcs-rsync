@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use futures::{StreamExt, TryStreamExt};
 use gcs_rsync::{
     oauth2::token::ServiceAccountCredentials,
-    storage::{credentials, Object, ObjectClient, StorageResult},
+    storage::{Object, ObjectClient, StorageResult},
     sync::{RMirrorStatus, RSync, RSyncStatus, ReaderWriter, RelativePath, Source},
 };
 use tokio::io::AsyncWriteExt;
@@ -190,7 +190,7 @@ async fn test_sync_and_mirror_crc32c() {
     assert_upload_bytes(&object_client, &object, "hello").await;
 
     let src = Source::gcs(
-        Box::new(credentials::authorizeduser::default().await.unwrap()),
+        Box::new(get_service_account().await),
         &bucket,
         prefix.to_str().unwrap(),
     )
