@@ -81,7 +81,7 @@ pub mod credentials {
         pub fn with_scope(
             scope: &str,
         ) -> super::super::StorageResult<GoogleMetadataServerCredentials> {
-            GoogleMetadataServerCredentials::default()
+            GoogleMetadataServerCredentials::new()
                 .map(|x| x.with_scope(scope))
                 .map_err(super::super::Error::GcsTokenError)
         }
