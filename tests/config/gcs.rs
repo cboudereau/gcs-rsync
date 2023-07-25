@@ -1,15 +1,15 @@
 use std::path::PathBuf;
 
 use gcs_rsync::{
-    oauth2::token::AuthorizedUserCredentials,
-    storage::{credentials, Object},
+    oauth2::token::ServiceAccountCredentials,
+    storage::Object,
 };
 
 pub struct GcsTestConfig {
     bucket: String,
     prefix: PathBuf,
     list_prefix: String,
-    token: AuthorizedUserCredentials,
+    token: ServiceAccountCredentials,
 }
 
 #[allow(dead_code)] //remove this when this issue will be fixed: https://github.com/rust-lang/rust/issues/46379
@@ -32,13 +32,16 @@ impl GcsTestConfig {
             prefix.push(uuid);
             prefix
         };
-
-        let auc = credentials::authorizeduser::default().await.unwrap();
+        let path = env!("TEST_SERVICE_ACCOUNT");
+        let sac = ServiceAccountCredentials::from_file(path)
+            .await
+            .unwrap()
+            .with_scope("https://www.googleapis.com/auth/devstorage.full_control");
         Self {
             bucket: env!("TEST_BUCKET").to_owned(),
             prefix: prefix.to_owned(),
             list_prefix: prefix.to_string_lossy().to_string(),
-            token: auc,
+            token: sac,
         }
     }
 
@@ -63,7 +66,7 @@ impl GcsTestConfig {
         self.prefix.to_owned()
     }
 
-    pub fn token(self) -> AuthorizedUserCredentials {
+    pub fn token(self) -> ServiceAccountCredentials {
         self.token
     }
 }

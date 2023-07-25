@@ -76,7 +76,7 @@ pub mod credentials {
         use crate::oauth2::token::GoogleMetadataServerCredentials;
 
         pub fn default() -> super::super::StorageResult<GoogleMetadataServerCredentials> {
-            GoogleMetadataServerCredentials::default().map_err(super::super::Error::GcsTokenError)
+            GoogleMetadataServerCredentials::new().map_err(super::super::Error::GcsTokenError)
         }
     }
 }

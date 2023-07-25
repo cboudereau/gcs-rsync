@@ -264,7 +264,7 @@ impl ServiceAccountCredentials {
 pub struct GoogleMetadataServerCredentials {}
 
 impl GoogleMetadataServerCredentials {
-    pub fn default() -> TokenResult<Self> {
+    pub fn new() -> TokenResult<Self> {
         Ok(GoogleMetadataServerCredentials {})
     }
 }
