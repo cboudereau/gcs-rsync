@@ -1,9 +1,12 @@
 use std::ops::Not;
 
 use futures::{StreamExt, TryStreamExt};
-use gcs_rsync::storage::{
-    credentials, Metadata, Object, ObjectClient, ObjectMetadata, ObjectsListRequest, PartialObject,
-    StorageResult,
+use gcs_rsync::{
+    oauth2::token::ServiceAccountCredentials,
+    storage::{
+        Metadata, Object, ObjectClient, ObjectMetadata, ObjectsListRequest, PartialObject,
+        StorageResult,
+    },
 };
 
 mod config;
@@ -292,9 +295,13 @@ fn assert_not_found_response(err: gcs_rsync::storage::Error) {
 
 #[tokio::test]
 async fn test_api_list_objects_not_found_error() {
-    let auc = Box::new(credentials::authorizeduser::default().await.unwrap());
+    let path = env!("TEST_SERVICE_ACCOUNT");
+    let sac = ServiceAccountCredentials::from_file(path)
+        .await
+        .unwrap()
+        .with_scope("https://www.googleapis.com/auth/devstorage.full_control");
 
-    let object_client = ObjectClient::new(auc).await.unwrap();
+    let object_client = ObjectClient::new(Box::new(sac)).await.unwrap();
 
     let objects_list_request = ObjectsListRequest::default();
 

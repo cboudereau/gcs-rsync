@@ -8,6 +8,7 @@ use std::{
     fmt::{Debug, Display},
     path::Path,
 };
+use urlencoding::encode;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Token {
@@ -59,7 +60,7 @@ impl Token {
 }
 
 #[async_trait::async_trait]
-pub trait TokenGenerator {
+pub trait TokenGenerator: Sync + Send {
     async fn get(&self, client: &Client) -> TokenResult<Token>;
 }
 
@@ -137,10 +138,18 @@ impl TokenGenerator for ServiceAccountCredentials {
 impl TokenGenerator for GoogleMetadataServerCredentials {
     async fn get(&self, client: &Client) -> TokenResult<Token> {
         const DEFAULT_TOKEN_GCP_URI: &str = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
+        let uri = match self.scope {
+            None => DEFAULT_TOKEN_GCP_URI.to_string(),
+            Some(ref scope) => format!(
+                "{}?{}",
+                DEFAULT_TOKEN_GCP_URI,
+                encode(format!("scopes={}", scope).as_str())
+            ),
+        };
 
         let token: DeserializedResponse<Token> = client
             .client
-            .get(DEFAULT_TOKEN_GCP_URI)
+            .get(uri)
             .header("Metadata-Flavor", "Google")
             .send()
             .await
@@ -261,11 +270,17 @@ impl ServiceAccountCredentials {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct GoogleMetadataServerCredentials {}
+pub struct GoogleMetadataServerCredentials {
+    scope: Option<String>,
+}
 
 impl GoogleMetadataServerCredentials {
     pub fn new() -> TokenResult<Self> {
-        Ok(GoogleMetadataServerCredentials {})
+        Ok(GoogleMetadataServerCredentials { scope: None })
+    }
+    pub fn with_scope(mut self, scope: &str) -> Self {
+        self.scope = Some(scope.to_owned());
+        self
     }
 }
 
