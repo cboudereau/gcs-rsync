@@ -1,6 +1,6 @@
 [package]
 name = "gcs-rsync"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 description = "rsync support for gcs with higher perf than gsutil rsync"
 license = "MIT"
@@ -13,21 +13,21 @@ categories = ["command-line-utilities", "asynchronous", "web-programming", "api-
 [dependencies]
 serde_json       = "1.0"
 serde            = { version = "1.0",  features = ["derive"]}
-tokio            = { version = "1.12", features = ["fs"] }
+tokio            = { version = "1.29", features = ["fs"] }
 chrono           = { version = "0.4",  features = ["serde"] }
 reqwest          = { version = "0.11", default-features = false, features = ["rustls-tls", "json", "stream"] }
 futures          = { version = "0.3",  default_features = false, features = ["alloc"] }
-jsonwebtoken     = "7"
+jsonwebtoken     = "8"
 async-trait      = "0.1"
 percent-encoding = { version = "2",    default-features = false }
-bytes            = { version = "1.1",  default-features = false }
-base64           = { version = "0.13", default-features = false }
+bytes            = { version = "1.4",  default-features = false }
+base64           = { version = "0.21", default-features = false }
 tokio-util       = "0.7"
 crc32c           = "0.6"
 filetime         = "0.2"
 
 [dev-dependencies]
 tokio        = { version = "1.12", default-features = false, features = ["full"] }
-uuid         = { version = "0.8",  default-features = false, features = ["v4"] }
+uuid         = { version = "1.4",  default-features = false, features = ["v4"] }
 num_cpus     = "1"
 structopt    = { version = "0.3", default-features = false }

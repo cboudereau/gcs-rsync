@@ -25,7 +25,7 @@ impl GcsTestConfig {
 
         let prefix = {
             let mut prefix = to_path_buf(env!("TEST_PREFIX"));
-            let uuid = uuid::Uuid::new_v4().to_hyphenated().to_string();
+            let uuid = uuid::Uuid::new_v4().hyphenated().to_string();
             prefix.push(uuid);
             prefix
         };
