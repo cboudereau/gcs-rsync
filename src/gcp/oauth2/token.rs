@@ -275,7 +275,7 @@ pub struct GoogleMetadataServerCredentials {
 }
 
 impl GoogleMetadataServerCredentials {
-    pub fn default() -> TokenResult<Self> {
+    pub fn new() -> TokenResult<Self> {
         Ok(GoogleMetadataServerCredentials { scope: None })
     }
     pub fn with_scope(mut self, scope: &str) -> Self {

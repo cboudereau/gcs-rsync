@@ -1,5 +1,7 @@
 use std::{convert::TryInto, fmt::Display, str::FromStr};
 
+use base64::Engine;
+
 use crate::storage::{Error, StorageResult};
 
 #[derive(Debug, PartialEq, Eq, serde::Serialize, Clone)]
@@ -224,7 +226,8 @@ impl FromStr for CRC32C {
     type Err = Base64EncodedCRC32CError;
 
     fn from_str(base64crc32c: &str) -> Result<Self, Self::Err> {
-        let decoded = base64::decode(base64crc32c.as_bytes())
+        let decoded = base64::engine::general_purpose::STANDARD
+            .decode(base64crc32c)
             .map_err(|err| Base64EncodedCRC32CError::Base64DecodeError(format!("{:?}", err)))?;
         let crc32c = decoded
             .try_into()
