@@ -18,7 +18,7 @@ use config::gcs::GcsTestConfig;
 impl FsTestConfig {
     fn new() -> Self {
         let base_path = {
-            let uuid = uuid::Uuid::new_v4().to_hyphenated().to_string();
+            let uuid = uuid::Uuid::new_v4().hyphenated().to_string();
             let mut tmp = std::env::temp_dir();
             tmp.push("rsync_integration_tests");
             tmp.push(uuid);
