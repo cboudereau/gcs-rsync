@@ -45,7 +45,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
+      
+      - name: Setup test default token
+        run: 'echo "$GOOGLE_APPLICATION_CREDENTIALS_TOKEN" > default_token.json'
+      - name: Setup test service_account token
+        run: 'echo "$TEST_SERVICE_ACCOUNT_TOKEN" > service_account.json'      - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
