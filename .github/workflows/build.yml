@@ -50,6 +50,7 @@ jobs:
         run: 'echo "$GOOGLE_APPLICATION_CREDENTIALS_TOKEN" > default_token.json'
       - name: Setup test service_account token
         run: 'echo "$TEST_SERVICE_ACCOUNT_TOKEN" > service_account.json'
+
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
