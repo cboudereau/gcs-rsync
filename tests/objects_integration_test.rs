@@ -20,9 +20,9 @@ async fn test_test_config() {
         t.list_prefix().is_empty().not(),
         "list prefix should not be empty"
     );
-
+    let name = t.object("object_name").name;
     assert!(
-        t.object("object_name").name.ends_with("/object_name"),
+        name.ends_with("/object_name") || name.ends_with("\\object_name"),
         "object name should end with /object_name"
     );
 
@@ -145,7 +145,8 @@ async fn test_get_object_ok() {
     let partial_object = object_client.get(&object, "name,selfLink").await.unwrap();
 
     assert!(partial_object.name.unwrap().ends_with("object.txt"));
-    assert!(partial_object.self_link.unwrap().ends_with("%2Fobject.txt"));
+    let self_link = partial_object.self_link.unwrap();
+    assert!(self_link.ends_with("%2Fobject.txt") || self_link.ends_with("%5Cobject.txt"));
     assert_eq!(None, partial_object.crc32c);
     assert_delete_ok(&object_client, &object).await;
 }
