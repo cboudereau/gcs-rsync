@@ -1,5 +1,7 @@
-/target
+target
 Cargo.lock
 flamegraph.svg
 .env
 .DS_Store
+/coverage
+**/*.profraw
