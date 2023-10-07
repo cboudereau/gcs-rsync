@@ -195,7 +195,7 @@ async fn test_upload_with_detailed_error() {
 
     let err = upload_bytes(&object_client, &object, "").await.unwrap_err();
 
-    assert_unexpected_response(err, "forbidden");
+    assert_unexpected_response(err, r#""code": 403"#);
 }
 
 #[tokio::test]
