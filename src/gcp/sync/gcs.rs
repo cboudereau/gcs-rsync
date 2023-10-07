@@ -176,7 +176,7 @@ impl GcsClient {
                 let date_time = entry
                     .metadata
                     .and_then(|x| x.modification_time)
-                    .map(|mtime| chrono::offset::Utc.timestamp(mtime, 0));
+                    .and_then(|mtime| chrono::offset::Utc.timestamp_opt(mtime, 0).single());
                 Ok((date_time, size))
             }
             Err(RSyncError::StorageError(StorageError::GcsResourceNotFound { .. })) => {

@@ -1,9 +1,12 @@
 use std::ops::Not;
 
 use futures::{StreamExt, TryStreamExt};
-use gcs_rsync::storage::{
-    credentials, Metadata, Object, ObjectClient, ObjectMetadata, ObjectsListRequest, PartialObject,
-    StorageResult,
+use gcs_rsync::{
+    oauth2::token::ServiceAccountCredentials,
+    storage::{
+        Metadata, Object, ObjectClient, ObjectMetadata, ObjectsListRequest, PartialObject,
+        StorageResult,
+    },
 };
 
 mod config;
@@ -17,9 +20,9 @@ async fn test_test_config() {
         t.list_prefix().is_empty().not(),
         "list prefix should not be empty"
     );
-
+    let name = t.object("object_name").name;
     assert!(
-        t.object("object_name").name.ends_with("/object_name"),
+        name.ends_with("/object_name") || name.ends_with("\\object_name"),
         "object name should end with /object_name"
     );
 
@@ -142,7 +145,8 @@ async fn test_get_object_ok() {
     let partial_object = object_client.get(&object, "name,selfLink").await.unwrap();
 
     assert!(partial_object.name.unwrap().ends_with("object.txt"));
-    assert!(partial_object.self_link.unwrap().ends_with("%2Fobject.txt"));
+    let self_link = partial_object.self_link.unwrap();
+    assert!(self_link.ends_with("%2Fobject.txt") || self_link.ends_with("%5Cobject.txt"));
     assert_eq!(None, partial_object.crc32c);
     assert_delete_ok(&object_client, &object).await;
 }
@@ -292,9 +296,13 @@ fn assert_not_found_response(err: gcs_rsync::storage::Error) {
 
 #[tokio::test]
 async fn test_api_list_objects_not_found_error() {
-    let auc = Box::new(credentials::authorizeduser::default().await.unwrap());
+    let path = env!("TEST_SERVICE_ACCOUNT");
+    let sac = ServiceAccountCredentials::from_file(path)
+        .await
+        .unwrap()
+        .with_scope("https://www.googleapis.com/auth/devstorage.full_control");
 
-    let object_client = ObjectClient::new(auc).await.unwrap();
+    let object_client = ObjectClient::new(Box::new(sac)).await.unwrap();
 
     let objects_list_request = ObjectsListRequest::default();
 
