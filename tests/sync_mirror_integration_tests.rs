@@ -389,7 +389,7 @@ async fn test_include_and_exclude_rsync_conf_base(
 }
 
 #[tokio::test]
-async fn test_include_only_one_file_rsync_conf() {
+async fn test_include_rsync_conf() {
     test_include_and_exclude_rsync_conf_base(
         vec![created("hello/world/test.txt")],
         vec![r#"hello/world/test.txt"#].as_slice(),
@@ -412,11 +412,27 @@ async fn test_include_only_one_file_rsync_conf() {
 }
 
 #[tokio::test]
-async fn test_multiple_include_file_rsync_conf() {
+async fn test_multiple_include_rsync_conf() {
     test_include_and_exclude_rsync_conf_base(
         vec![created("hello/world/test.txt"), created("test.json")],
-        vec![r#"hello/world/test.txt"#, "test.json"].as_slice(),
+        vec![r#"hello/**/test.txt"#, "test.json"].as_slice(),
         vec![].as_slice(),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn test_exclude_all_rsync_conf() {
+    test_include_and_exclude_rsync_conf_base(vec![], vec![].as_slice(), vec!["**"].as_slice())
+        .await;
+}
+
+#[tokio::test]
+async fn test_exclude_rsync_conf() {
+    test_include_and_exclude_rsync_conf_base(
+        vec![created("a/long/path/hello_world.toml")],
+        vec![].as_slice(),
+        vec!["test"].as_slice(),
     )
     .await;
 }
