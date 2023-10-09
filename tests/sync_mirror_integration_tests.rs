@@ -410,3 +410,13 @@ async fn test_include_only_one_file_rsync_conf() {
     )
     .await;
 }
+
+#[tokio::test]
+async fn test_multiple_include_file_rsync_conf() {
+    test_include_and_exclude_rsync_conf_base(
+        vec![created("hello/world/test.txt"), created("test.json")],
+        vec![r#"hello/world/test.txt"#, "test.json"].as_slice(),
+        vec![].as_slice(),
+    )
+    .await;
+}
