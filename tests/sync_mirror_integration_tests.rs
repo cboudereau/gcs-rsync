@@ -432,7 +432,17 @@ async fn test_exclude_rsync_conf() {
     test_include_and_exclude_rsync_conf_base(
         vec![created("a/long/path/hello_world.toml")],
         vec![].as_slice(),
-        vec!["test"].as_slice(),
+        vec!["*test.*"].as_slice(),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn test_exclude_multiple_rsync_conf() {
+    test_include_and_exclude_rsync_conf_base(
+        vec![created("test.json")],
+        vec![].as_slice(),
+        vec!["a/**/hello_world.toml", "hello/**/test.*"].as_slice(),
     )
     .await;
 }
