@@ -10,6 +10,7 @@ use futures::{Future, Stream, StreamExt, TryStreamExt};
 
 use fs::FsClient;
 use gcs::GcsClient;
+use globset::{Glob, GlobSet, GlobSetBuilder};
 
 use crate::oauth2::token::TokenGenerator;
 
@@ -132,6 +133,8 @@ pub struct RSync {
     source: ReaderWriterInternal,
     dest: ReaderWriterInternal,
     restore_fs_mtime: bool,
+    includes: Option<GlobSet>,
+    excludes: Option<GlobSet>,
 }
 
 impl RSync {
@@ -140,12 +143,43 @@ impl RSync {
             source: source.inner,
             dest: dest.inner,
             restore_fs_mtime: false,
+            includes: None,
+            excludes: None,
         }
     }
 
     pub fn with_restore_fs_mtime(mut self, restore_fs_mtime: bool) -> Self {
         self.restore_fs_mtime = restore_fs_mtime;
         self
+    }
+
+    fn glob_set(globs: &[&str]) -> RSyncResult<Option<GlobSet>> {
+        fn glob_error(error: globset::Error) -> RSyncError {
+            RSyncError::GlobError(error.to_string())
+        }
+
+        if globs.is_empty() {
+            Ok(None)
+        } else {
+            let glob_set = {
+                let mut builer = GlobSetBuilder::new();
+                for glob in globs {
+                    builer.add(Glob::new(glob).map_err(glob_error)?);
+                }
+                builer.build().map_err(glob_error)?
+            };
+            Ok(Some(glob_set))
+        }
+    }
+
+    pub fn with_includes(mut self, includes: &[&str]) -> RSyncResult<Self> {
+        self.includes = Self::glob_set(includes)?;
+        Ok(self)
+    }
+
+    pub fn with_excludes(mut self, excludes: &[&str]) -> RSyncResult<Self> {
+        self.excludes = Self::glob_set(excludes)?;
+        Ok(self)
     }
 
     async fn write_entry(
@@ -202,6 +236,25 @@ impl RSync {
         })
     }
 
+    fn filter(&self, relative_path: &RelativePath) -> bool {
+        let i = self
+            .includes
+            .as_ref()
+            .map(|includes| {
+                includes
+                    .matches(relative_path.path.as_str())
+                    .is_empty()
+                    .not()
+            })
+            .unwrap_or(true);
+        let x = self
+            .excludes
+            .as_ref()
+            .map(|excludes| excludes.matches(relative_path.path.as_str()).is_empty())
+            .unwrap_or(true);
+        i && x
+    }
+
     /// Sync synchronize source to destination by comparing crc32c if destination already exists
     ///
     /// Example
@@ -255,6 +308,7 @@ impl RSync {
         self.source
             .list()
             .await
+            .try_filter(|x| futures::future::ready(self.filter(x)))
             .map_ok(move |path| async move { self.sync_entry(&path).await })
     }
 
@@ -264,7 +318,7 @@ impl RSync {
     {
         self.dest.list().await.map(move |result| {
             result.map(|path| async move {
-                if self.source.exists(&path).await?.not() {
+                if self.source.exists(&path).await?.not() || self.filter(&path).not() {
                     self.dest.delete(&path).await?;
                     Ok(RMirrorStatus::Deleted(path))
                 } else {
@@ -386,6 +440,7 @@ pub enum RSyncError {
         error: std::io::Error,
     },
     EmptyRelativePathError,
+    GlobError(String),
 }
 
 impl RSyncError {
