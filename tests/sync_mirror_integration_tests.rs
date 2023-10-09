@@ -398,6 +398,13 @@ async fn test_include_only_one_file_rsync_conf() {
     .await;
     test_include_and_exclude_rsync_conf_base(
         vec![created("hello/world/test.txt")],
+        vec![r#"hello/**/test.txt"#].as_slice(),
+        vec![].as_slice(),
+    )
+    .await;
+
+    test_include_and_exclude_rsync_conf_base(
+        vec![created("hello/world/test.txt")],
         vec!["*.txt"].as_slice(),
         vec![].as_slice(),
     )
