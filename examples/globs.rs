@@ -1,3 +1,5 @@
+use std::ops::Not;
+
 use globset::{Glob, GlobSetBuilder};
 
 fn glob(s: &str) -> Result<Glob, ()> {
@@ -13,7 +15,7 @@ fn main() -> Result<(), ()> {
         .build()
         .map_err(|e| eprintln!("failed to build globs with error:\n{e}"))?;
 
-    assert!(set.matches("hello").len() > 0);
+    assert!(set.matches("hello").is_empty().not());
 
     Ok(())
 }
