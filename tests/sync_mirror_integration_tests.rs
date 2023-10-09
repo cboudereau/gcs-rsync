@@ -375,7 +375,9 @@ async fn test_include_and_exclude_rsync_conf() {
 
     let gcs = generate_gcs(GcsTestConfig::from_env().await).await;
     let fs = Source::fs(fs.base_path.as_path());
-    let rsync = RSync::new(fs, gcs).with_includes(vec!["**/*.txt"].as_slice()).unwrap();
+    let rsync = RSync::new(fs, gcs)
+        .with_includes(vec!["**/*.txt"].as_slice())
+        .unwrap();
     let expected = sync(&rsync).await;
 
     assert_eq!(vec![created("hello/world/test.txt")], expected);
