@@ -218,6 +218,19 @@ async fn test_sync_and_mirror_crc32c() {
     assert_eq!(vec![deleted("hello.txt")], mirror(&rsync).await);
 }
 
+async fn generate_gcs(test_config: GcsTestConfig) -> Source {
+    let bucket = test_config.bucket();
+    let prefix = test_config.prefix();
+
+    Source::gcs(
+        Box::new(test_config.token()),
+        bucket.as_str(),
+        prefix.to_str().unwrap(),
+    )
+    .await
+    .unwrap()
+}
+
 async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
     let src_t = FsTestConfig::new();
 
@@ -232,18 +245,6 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
 
     setup_files(&file_names[..], "Hello World").await;
 
-    async fn generate_gcs(test_config: GcsTestConfig) -> Source {
-        let bucket = test_config.bucket();
-        let prefix = test_config.prefix();
-
-        Source::gcs(
-            Box::new(test_config.token()),
-            bucket.as_str(),
-            prefix.to_str().unwrap(),
-        )
-        .await
-        .unwrap()
-    }
     let gcs_dst_t = GcsTestConfig::from_env().await;
 
     let gcs_source_replica = async {
@@ -355,4 +356,27 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
     assert_eq!(expected, mirror(&rsync_gcs_to_gcs_replica).await);
     assert_eq!(expected, mirror(&rsync_fs_to_fs_replica).await);
     assert_eq!(expected, mirror(&rsync_gs_to_fs_replica).await);
+}
+
+#[tokio::test]
+async fn test_include_and_exclude_rsync_conf() {
+    let fs = FsTestConfig::new();
+
+    let file_names = vec![
+        "/hello/world/test.txt",
+        "test.json",
+        "a/long/path/hello_world.toml",
+    ]
+    .into_iter()
+    .map(|x| fs.file_path(x))
+    .collect::<Vec<_>>();
+
+    setup_files(&file_names[..], "Hello World").await;
+
+    let gcs = generate_gcs(GcsTestConfig::from_env().await).await;
+    let fs = Source::fs(fs.base_path.as_path());
+    let rsync = RSync::new(fs, gcs).with_includes(vec!["**/*.txt"].as_slice()).unwrap();
+    let expected = sync(&rsync).await;
+
+    assert_eq!(vec![created("hello/world/test.txt")], expected);
 }
