@@ -358,8 +358,11 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
     assert_eq!(expected, mirror(&rsync_gs_to_fs_replica).await);
 }
 
-#[tokio::test]
-async fn test_include_and_exclude_rsync_conf() {
+async fn test_include_and_exclude_rsync_conf_base(
+    expected: Vec<RSyncStatus>,
+    includes: &[&str],
+    excludes: &[&str],
+) {
     let fs = FsTestConfig::new();
 
     let file_names = vec![
@@ -376,9 +379,27 @@ async fn test_include_and_exclude_rsync_conf() {
     let gcs = generate_gcs(GcsTestConfig::from_env().await).await;
     let fs = Source::fs(fs.base_path.as_path());
     let rsync = RSync::new(fs, gcs)
-        .with_includes(vec!["**/*.txt"].as_slice())
+        .with_includes(includes)
+        .unwrap()
+        .with_excludes(excludes)
         .unwrap();
-    let expected = sync(&rsync).await;
+    let actual = sync(&rsync).await;
 
-    assert_eq!(vec![created("hello/world/test.txt")], expected);
+    assert_eq!(expected, actual);
+}
+
+#[tokio::test]
+async fn test_include_only_one_file_rsync_conf() {
+    test_include_and_exclude_rsync_conf_base(
+        vec![created("hello/world/test.txt")],
+        vec![r#"hello/world/test.txt"#].as_slice(),
+        vec![].as_slice(),
+    )
+    .await;
+    test_include_and_exclude_rsync_conf_base(
+        vec![created("hello/world/test.txt")],
+        vec!["*.txt"].as_slice(),
+        vec![].as_slice(),
+    )
+    .await;
 }
