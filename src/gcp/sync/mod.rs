@@ -318,7 +318,7 @@ impl RSync {
     {
         self.dest.list().await.map(move |result| {
             result.map(|path| async move {
-                if self.source.exists(&path).await?.not() {
+                if self.source.exists(&path).await?.not() || self.filter(&path).not() {
                     self.dest.delete(&path).await?;
                     Ok(RMirrorStatus::Deleted(path))
                 } else {

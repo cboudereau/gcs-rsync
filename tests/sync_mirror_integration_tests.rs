@@ -4,7 +4,7 @@ use futures::{StreamExt, TryStreamExt};
 use gcs_rsync::{
     oauth2::token::ServiceAccountCredentials,
     storage::{Object, ObjectClient, StorageResult},
-    sync::{RMirrorStatus, RSync, RSyncStatus, ReaderWriter, RelativePath, Source},
+    sync::{RMirrorStatus, RSync, RSyncError, RSyncStatus, ReaderWriter, RelativePath, Source},
 };
 use tokio::io::AsyncWriteExt;
 
@@ -218,20 +218,20 @@ async fn test_sync_and_mirror_crc32c() {
     assert_eq!(vec![deleted("hello.txt")], mirror(&rsync).await);
 }
 
-async fn generate_gcs(test_config: GcsTestConfig) -> Source {
-    let bucket = test_config.bucket();
-    let prefix = test_config.prefix();
-
-    Source::gcs(
-        Box::new(test_config.token()),
-        bucket.as_str(),
-        prefix.to_str().unwrap(),
-    )
-    .await
-    .unwrap()
-}
-
 async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
+    async fn generate_gcs(test_config: GcsTestConfig) -> Source {
+        let bucket = test_config.bucket();
+        let prefix = test_config.prefix();
+
+        Source::gcs(
+            Box::new(test_config.token()),
+            bucket.as_str(),
+            prefix.to_str().unwrap(),
+        )
+        .await
+        .unwrap()
+    }
+
     let src_t = FsTestConfig::new();
 
     let file_names = vec![
@@ -363,6 +363,19 @@ async fn test_include_and_exclude_rsync_conf_base(
     includes: &[&str],
     excludes: &[&str],
 ) {
+    async fn generate_gcs(test_config: GcsTestConfig) -> Source {
+        let bucket = test_config.bucket();
+        let prefix = test_config.prefix();
+
+        Source::gcs(
+            Box::new(test_config.token()),
+            bucket.as_str(),
+            prefix.to_str().unwrap(),
+        )
+        .await
+        .unwrap()
+    }
+
     let fs = FsTestConfig::new();
 
     let file_names = vec![
@@ -445,4 +458,75 @@ async fn test_exclude_multiple_rsync_conf() {
         vec!["a/**/hello_world.toml", "hello/**/test.*"].as_slice(),
     )
     .await;
+}
+
+#[tokio::test]
+async fn test_mirror_include_and_exclude_rsync_conf() {
+    async fn rw_gcs(bucket: &str, prefix: &str) -> Result<ReaderWriter, RSyncError> {
+        let token_generator = Box::new(get_service_account().await);
+        ReaderWriter::gcs(token_generator, bucket, prefix).await
+    }
+
+    let fs = FsTestConfig::new();
+
+    let file_names = vec![
+        "/hello/world/test.txt",
+        "test.json",
+        "a/long/path/hello_world.toml",
+    ]
+    .into_iter()
+    .map(|x| fs.file_path(x))
+    .collect::<Vec<_>>();
+
+    setup_files(&file_names[..], "Hello World").await;
+
+    let gcs_config = GcsTestConfig::from_env().await;
+    let gcs_rw: ReaderWriter = rw_gcs(
+        gcs_config.bucket().as_str(),
+        gcs_config.prefix().to_str().unwrap(),
+    )
+    .await
+    .unwrap();
+
+    let fs_rw = Source::fs(fs.base_path.as_path());
+    let rsync = RSync::new(fs_rw, gcs_rw);
+    let actual = sync(&rsync).await;
+
+    assert_eq!(
+        vec![
+            created("a/long/path/hello_world.toml"),
+            created("hello/world/test.txt"),
+            created("test.json"),
+        ],
+        actual
+    );
+
+    let gcs_rw: ReaderWriter = rw_gcs(
+        gcs_config.bucket().as_str(),
+        gcs_config.prefix().to_str().unwrap(),
+    )
+    .await
+    .unwrap();
+
+    let fs_rw = Source::fs(fs.base_path.as_path());
+    let rsync = RSync::new(fs_rw, gcs_rw)
+        .with_excludes(vec!["*.json"].as_slice())
+        .unwrap();
+    let actual = mirror(&rsync).await;
+    assert_eq!(
+        vec![
+            synced(already_synced(
+                "same mtime and size",
+                "a/long/path/hello_world.toml"
+            )),
+            synced(already_synced(
+                "same mtime and size",
+                "hello/world/test.txt"
+            )),
+            deleted("test.json"),
+            not_deleted("a/long/path/hello_world.toml"),
+            not_deleted("hello/world/test.txt"),
+        ],
+        actual
+    );
 }
