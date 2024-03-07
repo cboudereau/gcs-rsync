@@ -46,6 +46,21 @@ docker run --rm -it -v ${GOOGLE_APPLICATION_CREDENTIALS}:/creds.json:ro -v <Your
 docker run --rm -it -v ${GOOGLE_APPLICATION_CREDENTIALS}:/creds.json:ro -v <YourFolderToDownloadTo>:/dest superbeeeeeee/gcs-rsync -r -m gs://<YourBucket>/<YourPrefix> /dest
 ```
 
+### Include or Exclude files using glob pattern
+
+#### CLI gcs-rsync
+
+```-i``` (include glob pattern) and ```-x``` (exclude glob pattern) multiple times.
+
+An example where any json or toml are included recursively except any test.json or test.toml recursively
+```bash
+docker run --rm -it -v ${GOOGLE_APPLICATION_CREDENTIALS}:/creds.json:ro -v <YourFolderToDownloadTo>:/dest superbeeeeeee/gcs-rsync -r -m -i **/*.json -i **/*.toml -x **/test.json -x **/test.toml
+ gs://<YourBucket>/<YourPrefix> /dest
+```
+
+#### Library
+```with_includes``` and ```with_excludes``` client builders are used to fill includes and excludes glob patterns.
+
 ## Benchmark
 
 Important note about gsutil: The `gsutil ls` command does not list all object items by default but instead list all prefixes while adding the `-r` flag slowdown `gsutil` performance. The `ls` performance command is very different to the `rsync` implementation.
