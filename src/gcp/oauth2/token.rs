@@ -24,12 +24,14 @@ pub struct Token {
     scope: Option<String>,
 }
 
+const ONE_SECOND_TO_MICROSECONDS: i64 = 1_000_000;
+
 fn from_expires_in<'de, D>(deserializer: D) -> std::result::Result<DateTime<Utc>, D::Error>
 where
     D: Deserializer<'de>,
 {
     let expires_in: i64 = Deserialize::deserialize(deserializer)?;
-    Ok(Utc::now() + chrono::Duration::seconds(expires_in))
+    Ok(Utc::now() + chrono::Duration::microseconds(expires_in * 1000_1000))
 }
 
 impl Display for Token {
@@ -50,7 +52,7 @@ impl Token {
     }
 
     pub fn is_valid(&self) -> bool {
-        self.expiry - chrono::Duration::seconds(30) > Utc::now()
+        self.expiry - chrono::Duration::microseconds(30 * ONE_SECOND_TO_MICROSECONDS) > Utc::now()
     }
 
     pub fn with_scope(mut self, scope: String) -> Self {
@@ -383,7 +385,8 @@ mod tests {
         let token = Token {
             access_token: "Hello".to_owned(),
             token_type: "token type".to_owned(),
-            expiry: chrono::Utc::now() + chrono::Duration::seconds(35),
+            expiry: chrono::Utc::now()
+                + chrono::Duration::microseconds(35 * ONE_SECOND_TO_MICROSECONDS),
             scope: None,
         };
 
