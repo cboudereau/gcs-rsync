@@ -336,7 +336,7 @@ mod tests {
                 .as_relative_path("prefix/hello/world")
                 .unwrap()
         );
-        
+
         assert_eq!(
             RelativePath::new("hello/world").unwrap(),
             ObjectPrefix::new("bucket", "/prefix/hello/")
