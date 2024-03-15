@@ -23,18 +23,9 @@ struct ObjectPrefix {
 }
 
 impl ObjectPrefix {
-    /// Invariant: a prefix should not start by slash but ends with except if empty
     fn new(bucket: &str, prefix: &str) -> Self {
         let bucket = bucket.to_owned();
-
-        let prefix = prefix.strip_prefix('/').unwrap_or(prefix);
-        let prefix = if prefix.is_empty() {
-            "".to_owned()
-        } else if prefix.ends_with('/') {
-            prefix.to_owned()
-        } else {
-            format!("{}/", prefix)
-        };
+        let prefix = prefix.to_owned();
 
         let objects_list_request = ObjectsListRequest {
             prefix: Some(prefix.to_owned()),
@@ -52,13 +43,7 @@ impl ObjectPrefix {
     fn as_object(&self, name: &RelativePath) -> RSyncResult<Object> {
         let name = name.path.as_str();
 
-        let object = {
-            if self.prefix.is_empty() {
-                Object::new(&self.bucket, name)
-            } else {
-                Object::new(&self.bucket, format!("{}{}", &self.prefix, name).as_str())
-            }
-        };
+        let object = Object::new(&self.bucket, name);
         object.map_err(RSyncError::StorageError)
     }
 
@@ -68,7 +53,11 @@ impl ObjectPrefix {
         } else {
             self.prefix.as_str()
         };
-        let path = name.strip_prefix(prefix).unwrap_or(name);
+        let path = if self.prefix.ends_with("/") {
+            name.strip_prefix(prefix).unwrap_or(name)
+        } else {
+            name
+        };
         RelativePath::new(path)
     }
 }
