@@ -51,7 +51,7 @@ impl ObjectPrefix {
                 format!("{prefix}/{name}")
             }
         };
-        
+
         let object = Object::new(&self.bucket, name.as_str());
         object.map_err(RSyncError::StorageError)
     }
