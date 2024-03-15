@@ -54,16 +54,26 @@ async fn get_source(
 ) -> RSyncResult<Source> {
     match Object::from_str(path).ok() {
         Some(o) => {
-            let token_generator: Box<dyn TokenGenerator> = if use_metadata_token_api {
-                Box::new(metadata::default().map_err(RSyncError::StorageError)?)
+            let token_generator: Option<Box<dyn TokenGenerator>> = if use_metadata_token_api {
+                Some(Box::new(
+                    metadata::default().map_err(RSyncError::StorageError)?,
+                ))
             } else {
-                Box::new(
-                    authorizeduser::default()
-                        .await
-                        .map_err(RSyncError::StorageError)?,
-                )
+                let token_generator = authorizeduser::default().await;
+                match token_generator {
+                    Err(err) => {
+                        println!("using no auth for public gcs download only: {err}");
+                        None
+                    }
+                    Ok(o) => Some(Box::new(o)),
+                }
             };
-            Source::gcs(token_generator, o.bucket.as_str(), o.name.as_str()).await
+            let bucket = o.name.as_str();
+            let prefix = o.name.as_str();
+            match token_generator {
+                None => Ok(Source::public_gcs(bucket, prefix)),
+                Some(token_generator) => Source::gcs(token_generator, bucket, prefix).await,
+            }
         }
         None => {
             let path = Path::new(path);

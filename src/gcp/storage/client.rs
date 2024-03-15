@@ -75,11 +75,23 @@ const MT_METADATA_TYPE: &[u8] = b"Content-Type: application/json; charset=utf-8\
 impl StorageClient {
     pub async fn new(token_generator: Box<dyn TokenGenerator>) -> StorageResult<Self> {
         let client = Client::default();
-        let token_state = Some(TokenStateHolder::new(client.clone(), token_generator).await?);
+        let token_state_holder =
+            Some(TokenStateHolder::new(client.clone(), token_generator).await?);
+
         Ok(Self {
             client,
-            token_state_holder: token_state,
+            token_state_holder,
         })
+    }
+
+    pub fn no_auth() -> Self {
+        let client = Client::default();
+        let token_state_holder = None;
+
+        Self {
+            client,
+            token_state_holder,
+        }
     }
 
     async fn success_response(

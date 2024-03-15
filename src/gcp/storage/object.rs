@@ -19,6 +19,12 @@ impl ObjectClient {
         })
     }
 
+    pub fn no_auth() -> Self {
+        Self {
+            storage_client: StorageClient::no_auth(),
+        }
+    }
+
     pub async fn get(&self, o: &Object, fields: &str) -> StorageResult<PartialObject> {
         let url = o.url();
         self.storage_client

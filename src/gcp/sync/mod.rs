@@ -34,6 +34,11 @@ impl ReaderWriter {
         Ok(Self::new(ReaderWriterInternal::Gcs(Box::new(client))))
     }
 
+    pub fn public_gcs(bucket: &str, prefix: &str) -> Self {
+        let client = GcsClient::no_auth(bucket, prefix);
+        Self::new(ReaderWriterInternal::Gcs(Box::new(client)))
+    }
+
     pub fn fs(base_path: &Path) -> Self {
         let client = FsClient::new(base_path);
         Self::new(ReaderWriterInternal::Fs(Box::new(client)))
