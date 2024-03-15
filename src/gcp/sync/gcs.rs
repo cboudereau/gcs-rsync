@@ -42,8 +42,17 @@ impl ObjectPrefix {
 
     fn as_object(&self, name: &RelativePath) -> RSyncResult<Object> {
         let name = name.path.as_str();
-
-        let object = Object::new(&self.bucket, name);
+        let name = {
+            let prefix = self.prefix.as_str();
+            let prefix = prefix.strip_suffix('/').unwrap_or(prefix);
+            if prefix.is_empty() {
+                name.to_owned()
+            } else {
+                format!("{prefix}/{name}")
+            }
+        };
+        
+        let object = Object::new(&self.bucket, name.as_str());
         object.map_err(RSyncError::StorageError)
     }
 
@@ -253,13 +262,20 @@ mod tests {
         assert_eq!(
             Object::new("bucket", "prefix/hello").unwrap(),
             ObjectPrefix::new("bucket", "prefix")
+                .as_object(&RelativePath::new("hello").unwrap())
+                .unwrap()
+        );
+
+        assert_eq!(
+            Object::new("bucket", "prefix/hello").unwrap(),
+            ObjectPrefix::new("bucket", "/")
                 .as_object(&RelativePath::new("prefix/hello").unwrap())
                 .unwrap()
         );
 
         assert_eq!(
             Object::new("bucket", "prefix/hello").unwrap(),
-            ObjectPrefix::new("bucket", "prefix/")
+            ObjectPrefix::new("bucket", "")
                 .as_object(&RelativePath::new("prefix/hello").unwrap())
                 .unwrap()
         );
@@ -267,14 +283,14 @@ mod tests {
         assert_eq!(
             Object::new("bucket", "prefix/hello").unwrap(),
             ObjectPrefix::new("bucket", "/prefix/")
-                .as_object(&RelativePath::new("prefix/hello").unwrap())
+                .as_object(&RelativePath::new("hello").unwrap())
                 .unwrap()
         );
 
         assert_eq!(
             Object::new("bucket", "prefix/hello/world").unwrap(),
             ObjectPrefix::new("bucket", "/prefix/hello")
-                .as_object(&RelativePath::new("prefix/hello/world").unwrap())
+                .as_object(&RelativePath::new("world").unwrap())
                 .unwrap()
         );
     }
