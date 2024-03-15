@@ -53,7 +53,7 @@ impl ObjectPrefix {
         } else {
             self.prefix.as_str()
         };
-        let path = if self.prefix.ends_with("/") {
+        let path = if self.prefix.ends_with('/') {
             name.strip_prefix(prefix).unwrap_or(name)
         } else {
             name

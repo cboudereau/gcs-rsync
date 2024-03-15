@@ -3,7 +3,10 @@ use std::{path::Path, str::FromStr};
 use futures::{StreamExt, TryStreamExt};
 use gcs_rsync::{
     oauth2::token::TokenGenerator,
-    storage::{credentials::{authorizeduser, metadata}, Error, StorageResult},
+    storage::{
+        credentials::{authorizeduser, metadata},
+        Error, StorageResult,
+    },
     sync::{RSync, RSyncError, RSyncResult, Source},
 };
 
@@ -78,7 +81,6 @@ impl BucketPrefix {
     }
 }
 
-
 async fn get_source(
     path: &str,
     is_dest: bool,
@@ -94,7 +96,9 @@ async fn get_source(
                 let token_generator = authorizeduser::default().await;
                 match token_generator {
                     Err(_) => {
-                        println!("no default auth found, using no auth for public gcs download only");
+                        println!(
+                            "no default auth found, using no auth for public gcs download only"
+                        );
                         None
                     }
                     Ok(o) => Some(Box::new(o)),
