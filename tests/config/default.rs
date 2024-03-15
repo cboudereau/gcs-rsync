@@ -1,1 +1,1 @@
-pub const CONCURRENCY_LEVEL: usize = 1;
+pub const CONCURRENCY_LEVEL: usize = 12;
