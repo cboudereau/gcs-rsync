@@ -59,8 +59,10 @@ impl GcsTestConfig {
         self.bucket.to_owned()
     }
 
-    pub fn prefix(&self) -> PathBuf {
-        self.prefix.to_owned()
+    pub fn prefix(&self) -> String {
+        let prefix = self.prefix.to_str().unwrap();
+        let prefix = prefix.strip_suffix('/').unwrap_or(prefix);
+        format!("{prefix}/")
     }
 
     pub fn token(self) -> ServiceAccountCredentials {

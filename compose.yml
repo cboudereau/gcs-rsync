@@ -1,8 +1,0 @@
-services:
-  gsutil:
-    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:latest
-    entrypoint: tail -f /dev/null
-    networks:
-      - bridge
-networks:
-  bridge:

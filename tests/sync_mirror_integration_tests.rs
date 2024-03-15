@@ -83,8 +83,8 @@ async fn delete_files(file_names: &[PathBuf]) {
         .await;
 }
 
-async fn sync(fs_client: &RSync) -> Vec<RSyncStatus> {
-    let mut actual = fs_client
+async fn sync(rsync: &RSync) -> Vec<RSyncStatus> {
+    let mut actual = rsync
         .sync()
         .await
         .try_buffer_unordered(config::default::CONCURRENCY_LEVEL)
@@ -192,14 +192,14 @@ async fn test_sync_and_mirror_crc32c() {
     let src = Source::gcs(
         Box::new(get_service_account().await),
         &bucket,
-        prefix.to_str().unwrap(),
+        prefix.as_str(),
     )
     .await
     .unwrap();
 
     let bucket = gcs_dst.bucket();
     let prefix = gcs_dst.prefix();
-    let dest = Source::gcs(Box::new(gcs_dst.token()), &bucket, prefix.to_str().unwrap())
+    let dest = Source::gcs(Box::new(gcs_dst.token()), &bucket, prefix.as_str())
         .await
         .unwrap();
 
@@ -226,7 +226,7 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
         Source::gcs(
             Box::new(test_config.token()),
             bucket.as_str(),
-            prefix.to_str().unwrap(),
+            prefix.as_str(),
         )
         .await
         .unwrap()
@@ -251,7 +251,7 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
         let token_generator = Box::new(get_service_account().await);
         let bucket = gcs_dst_t.bucket();
         let prefix = gcs_dst_t.prefix();
-        ReaderWriter::gcs(token_generator, bucket.as_str(), prefix.to_str().unwrap())
+        ReaderWriter::gcs(token_generator, bucket.as_str(), prefix.as_str())
             .await
             .unwrap()
     }
@@ -261,7 +261,7 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
         let token_generator = Box::new(get_service_account().await);
         let bucket = gcs_dst_t.bucket();
         let prefix = gcs_dst_t.prefix();
-        ReaderWriter::gcs(token_generator, bucket.as_str(), prefix.to_str().unwrap())
+        ReaderWriter::gcs(token_generator, bucket.as_str(), prefix.as_str())
             .await
             .unwrap()
     }
@@ -370,7 +370,7 @@ async fn test_include_and_exclude_rsync_conf_base(
         Source::gcs(
             Box::new(test_config.token()),
             bucket.as_str(),
-            prefix.to_str().unwrap(),
+            prefix.as_str(),
         )
         .await
         .unwrap()
@@ -481,12 +481,9 @@ async fn test_mirror_include_and_exclude_rsync_conf() {
     setup_files(&file_names[..], "Hello World").await;
 
     let gcs_config = GcsTestConfig::from_env().await;
-    let gcs_rw: ReaderWriter = rw_gcs(
-        gcs_config.bucket().as_str(),
-        gcs_config.prefix().to_str().unwrap(),
-    )
-    .await
-    .unwrap();
+    let gcs_rw: ReaderWriter = rw_gcs(gcs_config.bucket().as_str(), gcs_config.prefix().as_str())
+        .await
+        .unwrap();
 
     let fs_rw = Source::fs(fs.base_path.as_path());
     let rsync = RSync::new(fs_rw, gcs_rw);
@@ -501,12 +498,9 @@ async fn test_mirror_include_and_exclude_rsync_conf() {
         actual
     );
 
-    let gcs_rw: ReaderWriter = rw_gcs(
-        gcs_config.bucket().as_str(),
-        gcs_config.prefix().to_str().unwrap(),
-    )
-    .await
-    .unwrap();
+    let gcs_rw: ReaderWriter = rw_gcs(gcs_config.bucket().as_str(), gcs_config.prefix().as_str())
+        .await
+        .unwrap();
 
     let fs_rw = Source::fs(fs.base_path.as_path());
     let rsync = RSync::new(fs_rw, gcs_rw)
