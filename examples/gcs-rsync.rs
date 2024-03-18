@@ -96,9 +96,7 @@ async fn get_source(
                 let token_generator = authorizeduser::default().await;
                 match token_generator {
                     Err(_) => {
-                        println!(
-                            "no default auth found, running gcs-rsync without auth"
-                        );
+                        println!("no default auth found, running gcs-rsync without auth");
                         None
                     }
                     Ok(o) => Some(Box::new(o)),
