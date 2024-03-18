@@ -37,13 +37,13 @@ cargo install --example gcs-rsync gcs-rsync
 ### Mirror local folder to gcs
 
 ```bash
-docker run --rm -it -v ${GOOGLE_APPLICATION_CREDENTIALS}:/creds.json:ro -v <YourFolderToUpload>:/source:ro superbeeeeeee/gcs-rsync -r -m /source gs://<YourBucket>/<YourPrefix>
+docker run --rm -it -v ${GOOGLE_APPLICATION_CREDENTIALS}:/creds.json:ro -v <YourFolderToUpload>:/source:ro superbeeeeeee/gcs-rsync -r -m /source gs://<YourBucket>/<YourFolderToUpload>/
 ```
 
 ### Mirror gcs to folder
 
 ```bash
-docker run --rm -it -v ${GOOGLE_APPLICATION_CREDENTIALS}:/creds.json:ro -v <YourFolderToDownloadTo>:/dest superbeeeeeee/gcs-rsync -r -m gs://<YourBucket>/<YourPrefix> /dest
+docker run --rm -it -v ${GOOGLE_APPLICATION_CREDENTIALS}:/creds.json:ro -v <YourFolderToDownloadTo>:/dest superbeeeeeee/gcs-rsync -r -m gs://<YourBucket>/<YourFolderToUpload>/ /dest
 ```
 
 ### Include or Exclude files using glob pattern
