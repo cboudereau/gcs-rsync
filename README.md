@@ -37,13 +37,19 @@ cargo install --example gcs-rsync gcs-rsync
 ### Mirror local folder to gcs
 
 ```bash
-docker run --rm -it -v ${GOOGLE_APPLICATION_CREDENTIALS}:/creds.json:ro -v <YourFolderToUpload>:/source:ro superbeeeeeee/gcs-rsync -r -m /source gs://<YourBucket>/<YourPrefix>
+docker run --rm -it -v ${GOOGLE_APPLICATION_CREDENTIALS}:/creds.json:ro -v <YourFolderToUpload>:/source:ro superbeeeeeee/gcs-rsync -r -m /source gs://<YourBucket>/<YourFolderToUpload>/
 ```
 
 ### Mirror gcs to folder
 
 ```bash
-docker run --rm -it -v ${GOOGLE_APPLICATION_CREDENTIALS}:/creds.json:ro -v <YourFolderToDownloadTo>:/dest superbeeeeeee/gcs-rsync -r -m gs://<YourBucket>/<YourPrefix> /dest
+docker run --rm -it -v ${GOOGLE_APPLICATION_CREDENTIALS}:/creds.json:ro -v <YourFolderToDownloadTo>:/dest superbeeeeeee/gcs-rsync -r -m gs://<YourBucket>/<YourFolderToUpload>/ /dest
+```
+
+### Mirror partial gcs with prefix to folder
+
+```bash
+docker run --rm -it -v ${GOOGLE_APPLICATION_CREDENTIALS}:/creds.json:ro -v <YourFolderToDownloadTo>:/dest superbeeeeeee/gcs-rsync -r -m gs://<YourBucket>/<YourFolderToUpload>/<YourPrefix> /dest
 ```
 
 ### Include or Exclude files using glob pattern
@@ -55,7 +61,7 @@ docker run --rm -it -v ${GOOGLE_APPLICATION_CREDENTIALS}:/creds.json:ro -v <Your
 An example where any json or toml are included recursively except any test.json or test.toml recursively
 ```bash
 docker run --rm -it -v ${GOOGLE_APPLICATION_CREDENTIALS}:/creds.json:ro -v <YourFolderToDownloadTo>:/dest superbeeeeeee/gcs-rsync -r -m -i **/*.json -i **/*.toml -x **/test.json -x **/test.toml
- gs://<YourBucket>/<YourPrefix> /dest
+ gs://<YourBucket>/YourFolderToUpload>/ /dest
 ```
 
 #### Library
