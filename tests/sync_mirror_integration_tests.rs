@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use config::fs::FsTestConfig;
 use futures::{StreamExt, TryStreamExt};
 use gcs_rsync::{
     oauth2::token::ServiceAccountCredentials,
@@ -8,36 +9,14 @@ use gcs_rsync::{
 };
 use tokio::io::AsyncWriteExt;
 
-struct FsTestConfig {
-    base_path: PathBuf,
-}
+use crate::config::gcs::GcsTestConfig;
 
 mod config;
-use config::gcs::GcsTestConfig;
-
-impl FsTestConfig {
-    fn new() -> Self {
-        let base_path = {
-            let uuid = uuid::Uuid::new_v4().hyphenated().to_string();
-            let mut tmp = std::env::temp_dir();
-            tmp.push("rsync_integration_tests");
-            tmp.push(uuid);
-            tmp
-        };
-        Self { base_path }
-    }
-
-    fn file_path(&self, file_name: &str) -> PathBuf {
-        let mut p = self.base_path.clone();
-        let file_name = file_name.strip_prefix('/').unwrap_or(file_name);
-        p.push(file_name);
-        p
-    }
-}
 
 impl Drop for FsTestConfig {
     fn drop(&mut self) {
-        let path = self.base_path.as_path();
+        let base_path = self.base_path();
+        let path = base_path.as_path();
         std::fs::remove_dir_all(path).unwrap();
     }
 }
@@ -83,8 +62,8 @@ async fn delete_files(file_names: &[PathBuf]) {
         .await;
 }
 
-async fn sync(fs_client: &RSync) -> Vec<RSyncStatus> {
-    let mut actual = fs_client
+async fn sync(rsync: &RSync) -> Vec<RSyncStatus> {
+    let mut actual = rsync
         .sync()
         .await
         .try_buffer_unordered(config::default::CONCURRENCY_LEVEL)
@@ -179,20 +158,22 @@ async fn test_sync_and_mirror_crc32c() {
         );
     }
 
-    let gcs_src = GcsTestConfig::from_env().await;
-    let bucket = gcs_src.bucket();
-    let prefix = gcs_src.prefix();
+    let gcs_src_config = GcsTestConfig::from_env().await;
+    let src_config_bucket = gcs_src_config.bucket();
+    let src_config_prefix = gcs_src_config.prefix();
     let gcs_dst = GcsTestConfig::from_env().await;
 
-    let object = gcs_src.object("hello.txt");
+    let object = gcs_src_config.object("hello.txt");
 
-    let object_client = ObjectClient::new(Box::new(gcs_src.token())).await.unwrap();
+    let object_client = ObjectClient::new(Box::new(gcs_src_config.token()))
+        .await
+        .unwrap();
     assert_upload_bytes(&object_client, &object, "hello").await;
 
     let src = Source::gcs(
         Box::new(get_service_account().await),
-        &bucket,
-        prefix.to_str().unwrap(),
+        &src_config_bucket,
+        src_config_prefix.to_str().unwrap(),
     )
     .await
     .unwrap();
@@ -271,14 +252,14 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
 
     let gcs_dest = generate_gcs(gcs_dst_t).await;
 
-    let fs_source = Source::fs(src_t.base_path.as_path());
-    let fs_source_replica = Source::fs(src_t.base_path.as_path());
+    let fs_source = Source::fs(src_t.base_path().as_path());
+    let fs_source_replica = Source::fs(src_t.base_path().as_path());
 
     let fs_replica_t = FsTestConfig::new();
-    let fs_dest_replica = Source::fs(fs_replica_t.base_path.as_path());
+    let fs_dest_replica = Source::fs(fs_replica_t.base_path().as_path());
 
     let fs_replica_t2 = FsTestConfig::new();
-    let fs_dest_replica2 = Source::fs(fs_replica_t2.base_path.as_path());
+    let fs_dest_replica2 = Source::fs(fs_replica_t2.base_path().as_path());
 
     let rsync_fs_to_gcs = RSync::new(fs_source, gcs_dest).with_restore_fs_mtime(set_fs_mtime);
     let rsync_gcs_to_gcs_replica =
@@ -390,7 +371,7 @@ async fn test_include_and_exclude_rsync_conf_base(
     setup_files(&file_names[..], "Hello World").await;
 
     let gcs = generate_gcs(GcsTestConfig::from_env().await).await;
-    let fs = Source::fs(fs.base_path.as_path());
+    let fs = Source::fs(fs.base_path().as_path());
     let rsync = RSync::new(fs, gcs)
         .with_includes(includes)
         .unwrap()
@@ -488,7 +469,7 @@ async fn test_mirror_include_and_exclude_rsync_conf() {
     .await
     .unwrap();
 
-    let fs_rw = Source::fs(fs.base_path.as_path());
+    let fs_rw = Source::fs(fs.base_path().as_path());
     let rsync = RSync::new(fs_rw, gcs_rw);
     let actual = sync(&rsync).await;
 
@@ -508,7 +489,7 @@ async fn test_mirror_include_and_exclude_rsync_conf() {
     .await
     .unwrap();
 
-    let fs_rw = Source::fs(fs.base_path.as_path());
+    let fs_rw = Source::fs(fs.base_path().as_path());
     let rsync = RSync::new(fs_rw, gcs_rw)
         .with_excludes(vec!["*.json"].as_slice())
         .unwrap();

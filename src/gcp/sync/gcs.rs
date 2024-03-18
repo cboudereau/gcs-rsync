@@ -91,6 +91,15 @@ impl GcsClient {
         })
     }
 
+    pub(super) fn no_auth(bucket: &str, prefix: &str) -> Self {
+        let object_client = ObjectClient::no_auth();
+        let object_prefix = ObjectPrefix::new(bucket, prefix);
+        Self {
+            client: object_client,
+            object_prefix,
+        }
+    }
+
     pub(super) async fn list(&self) -> impl Stream<Item = RSyncResult<RelativePath>> + '_ {
         self.client
             .list(
