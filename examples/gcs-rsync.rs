@@ -133,8 +133,8 @@ async fn main() -> RSyncResult<()> {
         restore_fs_mtime: true,
         includes: vec![],
         excludes: vec![],
-        source: "gs://gcs-rsync-dev-public/".to_owned(),
-        dest: r#"C:\Users\cboudereau\gh\gcs-rsync\output"#.to_owned(),
+        dest: "gs://gcs-rsync-dev-public/".to_owned(),
+        source: r#"C:\Users\cboudereau\gh\gcs-rsync\output"#.to_owned(),
     };
     let source = get_source(&opt.source, false, opt.use_metadata_token_api).await?;
     let dest = get_source(&opt.dest, true, opt.use_metadata_token_api).await?;

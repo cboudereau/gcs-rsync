@@ -9,8 +9,8 @@ use tokio::{
 
 #[tokio::main]
 async fn main() -> StorageResult<()> {
-    let bucket = "mina_network_block_data";
-    let name = "mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json";
+    let bucket = "gcs-rsync-dev-public";
+    let name = "hello.txt";
 
     let object_client = ObjectClient::no_auth();
 
@@ -19,7 +19,7 @@ async fn main() -> StorageResult<()> {
 
     let object = Object::new(
         bucket,
-        "mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json",
+        "hello.txt",
     )?;
     let mut stream = object_client.download(&object).await.unwrap();
 
