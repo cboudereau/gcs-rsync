@@ -58,11 +58,19 @@ impl ObjectPrefix {
 
     fn as_relative_path(&self, name: &str) -> RSyncResult<RelativePath> {
         let prefix = self.prefix.as_str();
-        let path = if self.prefix.ends_with('/') {
-            name.strip_prefix(prefix).unwrap_or(name)
-        } else {
-            name
+        let path = match prefix.rfind('/') {
+            None => name,
+            Some(p) => {
+                //parent prefix
+                let prefix = if p + 1 == prefix.len() {
+                    prefix
+                } else {
+                    &prefix[..p]
+                };
+                name.strip_prefix(prefix).unwrap_or(name)
+            }
         };
+
         RelativePath::new(path)
     }
 }
@@ -239,6 +247,7 @@ impl GcsClient {
 
 #[cfg(test)]
 mod tests {
+
     use crate::{gcp::sync::RelativePath, storage::Object};
 
     use super::ObjectPrefix;
@@ -333,7 +342,7 @@ mod tests {
         );
 
         assert_eq!(
-            RelativePath::new("prefix/hello/world").unwrap(),
+            RelativePath::new("hello/world").unwrap(),
             ObjectPrefix::new("bucket", "prefix/hello")
                 .as_relative_path("prefix/hello/world")
                 .unwrap()

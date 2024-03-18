@@ -179,26 +179,28 @@ async fn test_sync_and_mirror_crc32c() {
         );
     }
 
-    let gcs_src = GcsTestConfig::from_env().await;
-    let bucket = gcs_src.bucket();
-    let prefix = gcs_src.prefix();
+    let gcs_src_config = GcsTestConfig::from_env().await;
+    let src_config_bucket = gcs_src_config.bucket();
+    let src_config_prefix = gcs_src_config.prefix_as_folder();
     let gcs_dst = GcsTestConfig::from_env().await;
 
-    let object = gcs_src.object("hello.txt");
+    let object = gcs_src_config.object("hello.txt");
 
-    let object_client = ObjectClient::new(Box::new(gcs_src.token())).await.unwrap();
+    let object_client = ObjectClient::new(Box::new(gcs_src_config.token()))
+        .await
+        .unwrap();
     assert_upload_bytes(&object_client, &object, "hello").await;
 
     let src = Source::gcs(
         Box::new(get_service_account().await),
-        &bucket,
-        prefix.as_str(),
+        &src_config_bucket,
+        src_config_prefix.as_str(),
     )
     .await
     .unwrap();
 
     let bucket = gcs_dst.bucket();
-    let prefix = gcs_dst.prefix();
+    let prefix = gcs_dst.prefix_as_folder();
     let dest = Source::gcs(Box::new(gcs_dst.token()), &bucket, prefix.as_str())
         .await
         .unwrap();
@@ -221,7 +223,7 @@ async fn test_sync_and_mirror_crc32c() {
 async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
     async fn generate_gcs(test_config: GcsTestConfig) -> Source {
         let bucket = test_config.bucket();
-        let prefix = test_config.prefix();
+        let prefix = test_config.prefix_as_folder();
 
         Source::gcs(
             Box::new(test_config.token()),
@@ -250,7 +252,7 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
     let gcs_source_replica = async {
         let token_generator = Box::new(get_service_account().await);
         let bucket = gcs_dst_t.bucket();
-        let prefix = gcs_dst_t.prefix();
+        let prefix = gcs_dst_t.prefix_as_folder();
         ReaderWriter::gcs(token_generator, bucket.as_str(), prefix.as_str())
             .await
             .unwrap()
@@ -260,7 +262,7 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
     let gcs_source_replica2 = async {
         let token_generator = Box::new(get_service_account().await);
         let bucket = gcs_dst_t.bucket();
-        let prefix = gcs_dst_t.prefix();
+        let prefix = gcs_dst_t.prefix_as_folder();
         ReaderWriter::gcs(token_generator, bucket.as_str(), prefix.as_str())
             .await
             .unwrap()
@@ -365,7 +367,7 @@ async fn test_include_and_exclude_rsync_conf_base(
 ) {
     async fn generate_gcs(test_config: GcsTestConfig) -> Source {
         let bucket = test_config.bucket();
-        let prefix = test_config.prefix();
+        let prefix = test_config.prefix_as_folder();
 
         Source::gcs(
             Box::new(test_config.token()),
@@ -481,9 +483,12 @@ async fn test_mirror_include_and_exclude_rsync_conf() {
     setup_files(&file_names[..], "Hello World").await;
 
     let gcs_config = GcsTestConfig::from_env().await;
-    let gcs_rw: ReaderWriter = rw_gcs(gcs_config.bucket().as_str(), gcs_config.prefix().as_str())
-        .await
-        .unwrap();
+    let gcs_rw: ReaderWriter = rw_gcs(
+        gcs_config.bucket().as_str(),
+        gcs_config.prefix_as_folder().as_str(),
+    )
+    .await
+    .unwrap();
 
     let fs_rw = Source::fs(fs.base_path.as_path());
     let rsync = RSync::new(fs_rw, gcs_rw);
@@ -498,9 +503,12 @@ async fn test_mirror_include_and_exclude_rsync_conf() {
         actual
     );
 
-    let gcs_rw: ReaderWriter = rw_gcs(gcs_config.bucket().as_str(), gcs_config.prefix().as_str())
-        .await
-        .unwrap();
+    let gcs_rw: ReaderWriter = rw_gcs(
+        gcs_config.bucket().as_str(),
+        gcs_config.prefix_as_folder().as_str(),
+    )
+    .await
+    .unwrap();
 
     let fs_rw = Source::fs(fs.base_path.as_path());
     let rsync = RSync::new(fs_rw, gcs_rw)

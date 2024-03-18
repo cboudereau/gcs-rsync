@@ -130,10 +130,10 @@ async fn main() -> RSyncResult<()> {
     let opt = Opt {
         use_metadata_token_api: false,
         mirror: false,
-        restore_fs_mtime: false,
+        restore_fs_mtime: true,
         includes: vec![],
         excludes: vec![],
-        source: "gs://mina_network_block_data/mainnet-2-".to_owned(),
+        source: "gs://gcs-rsync-dev-public/".to_owned(),
         dest: r#"C:\Users\cboudereau\gh\gcs-rsync\output"#.to_owned(),
     };
     let source = get_source(&opt.source, false, opt.use_metadata_token_api).await?;
