@@ -23,18 +23,9 @@ struct ObjectPrefix {
 }
 
 impl ObjectPrefix {
-    /// Invariant: a prefix should not start by slash but ends with except if empty
     fn new(bucket: &str, prefix: &str) -> Self {
         let bucket = bucket.to_owned();
-
-        let prefix = prefix.strip_prefix('/').unwrap_or(prefix);
-        let prefix = if prefix.is_empty() {
-            "".to_owned()
-        } else if prefix.ends_with('/') {
-            prefix.to_owned()
-        } else {
-            format!("{}/", prefix)
-        };
+        let prefix = prefix.strip_prefix('/').unwrap_or(prefix).to_owned();
 
         let objects_list_request = ObjectsListRequest {
             prefix: Some(prefix.to_owned()),
@@ -49,26 +40,29 @@ impl ObjectPrefix {
         }
     }
 
+    fn try_get_folder(prefix: &str) -> Option<String> {
+        prefix.rfind('/').map(|pos| prefix[..pos + 1].to_owned())
+    }
+
     fn as_object(&self, name: &RelativePath) -> RSyncResult<Object> {
         let name = name.path.as_str();
-
-        let object = {
-            if self.prefix.is_empty() {
-                Object::new(&self.bucket, name)
-            } else {
-                Object::new(&self.bucket, format!("{}{}", &self.prefix, name).as_str())
-            }
+        let name = {
+            let prefix = self.prefix.as_str();
+            Self::try_get_folder(prefix)
+                .map(|prefix| format!("{prefix}{name}"))
+                .unwrap_or_else(|| name.to_owned())
         };
+
+        let object = Object::new(&self.bucket, name.as_str());
         object.map_err(RSyncError::StorageError)
     }
 
     fn as_relative_path(&self, name: &str) -> RSyncResult<RelativePath> {
-        let prefix = if self.prefix.is_empty() {
-            "/"
-        } else {
-            self.prefix.as_str()
-        };
-        let path = name.strip_prefix(prefix).unwrap_or(name);
+        let prefix = self.prefix.as_str();
+        let path = Self::try_get_folder(prefix)
+            .and_then(|prefix| name.strip_prefix(prefix.as_str()))
+            .unwrap_or(name);
+
         RelativePath::new(path)
     }
 }
@@ -245,9 +239,23 @@ impl GcsClient {
 
 #[cfg(test)]
 mod tests {
+
     use crate::{gcp::sync::RelativePath, storage::Object};
 
     use super::ObjectPrefix;
+
+    #[test]
+    fn test_try_get_parent() {
+        assert_eq!(Some("/".to_owned()), ObjectPrefix::try_get_folder("/"));
+        assert_eq!(
+            Some("/hello/world/".to_owned()),
+            ObjectPrefix::try_get_folder("/hello/world/hello")
+        );
+        assert_eq!(
+            Some("/hello/world/".to_owned()),
+            ObjectPrefix::try_get_folder("/hello/world/")
+        );
+    }
 
     #[test]
     fn test_object_prefix_as_object() {
@@ -261,19 +269,40 @@ mod tests {
         assert_eq!(
             Object::new("bucket", "hello").unwrap(),
             ObjectPrefix::new("bucket", "")
-                .as_object(&RelativePath::new("/hello").unwrap())
+                .as_object(&RelativePath::new("hello").unwrap())
                 .unwrap()
         );
 
         assert_eq!(
-            Object::new("bucket", "prefix/hello").unwrap(),
+            Object::new("bucket", "hello").unwrap(),
             ObjectPrefix::new("bucket", "prefix")
                 .as_object(&RelativePath::new("hello").unwrap())
                 .unwrap()
         );
 
         assert_eq!(
-            Object::new("bucket", "prefix/hello/world").unwrap(),
+            Object::new("bucket", "prefix/hello").unwrap(),
+            ObjectPrefix::new("bucket", "/")
+                .as_object(&RelativePath::new("prefix/hello").unwrap())
+                .unwrap()
+        );
+
+        assert_eq!(
+            Object::new("bucket", "prefix/hello").unwrap(),
+            ObjectPrefix::new("bucket", "")
+                .as_object(&RelativePath::new("prefix/hello").unwrap())
+                .unwrap()
+        );
+
+        assert_eq!(
+            Object::new("bucket", "prefix/prefix2/hello").unwrap(),
+            ObjectPrefix::new("bucket", "/prefix/")
+                .as_object(&RelativePath::new("prefix2/hello").unwrap())
+                .unwrap()
+        );
+
+        assert_eq!(
+            Object::new("bucket", "prefix/world").unwrap(),
             ObjectPrefix::new("bucket", "/prefix/hello")
                 .as_object(&RelativePath::new("world").unwrap())
                 .unwrap()
@@ -281,7 +310,7 @@ mod tests {
     }
 
     #[test]
-    fn test_object_prefix() {
+    fn test_object_prefix_as_relative_path() {
         assert_eq!(
             RelativePath::new("hello").unwrap(),
             ObjectPrefix::new("bucket", "")
@@ -290,7 +319,7 @@ mod tests {
         );
 
         assert_eq!(
-            RelativePath::new("hello").unwrap(),
+            RelativePath::new("/hello").unwrap(),
             ObjectPrefix::new("bucket", "")
                 .as_relative_path("/hello")
                 .unwrap()
@@ -298,21 +327,35 @@ mod tests {
 
         assert_eq!(
             RelativePath::new("hello").unwrap(),
-            ObjectPrefix::new("bucket", "/prefix")
-                .as_relative_path("prefix/hello")
+            ObjectPrefix::new("bucket", "/prefix/")
+                .as_relative_path("hello")
                 .unwrap()
         );
 
         assert_eq!(
-            RelativePath::new("hello").unwrap(),
+            RelativePath::new("prefix/hello").unwrap(),
             ObjectPrefix::new("bucket", "prefix")
                 .as_relative_path("prefix/hello")
                 .unwrap()
         );
 
         assert_eq!(
-            RelativePath::new("world").unwrap(),
+            RelativePath::new("hello").unwrap(),
+            ObjectPrefix::new("bucket", "prefix/")
+                .as_relative_path("hello")
+                .unwrap()
+        );
+
+        assert_eq!(
+            RelativePath::new("hello/world").unwrap(),
             ObjectPrefix::new("bucket", "prefix/hello")
+                .as_relative_path("hello/world")
+                .unwrap()
+        );
+
+        assert_eq!(
+            RelativePath::new("world").unwrap(),
+            ObjectPrefix::new("bucket", "prefix/hello/")
                 .as_relative_path("prefix/hello/world")
                 .unwrap()
         );
@@ -320,6 +363,13 @@ mod tests {
         assert_eq!(
             RelativePath::new("hello/world").unwrap(),
             ObjectPrefix::new("bucket", "prefix/")
+                .as_relative_path("prefix/hello/world")
+                .unwrap()
+        );
+
+        assert_eq!(
+            RelativePath::new("world").unwrap(),
+            ObjectPrefix::new("bucket", "/prefix/hello/")
                 .as_relative_path("prefix/hello/world")
                 .unwrap()
         );

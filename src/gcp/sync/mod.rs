@@ -410,10 +410,9 @@ impl std::fmt::Debug for RelativePath {
 }
 
 impl RelativePath {
-    /// Invariant: a name should not start with a slash
     pub fn new(path: &str) -> RSyncResult<Self> {
-        let path = path.strip_prefix('/').unwrap_or(path).to_owned();
-        if path.is_empty() {
+        let path = path.replace('\\', "/").to_owned();
+        if path.is_empty() || path == "/" {
             Err(RSyncError::EmptyRelativePathError)
         } else {
             Ok(Self { path })
@@ -515,7 +514,7 @@ mod tests {
         );
         assert!(is_empty_err(RelativePath::new("/").unwrap_err()));
         assert_eq!(
-            "hello/world",
+            "/hello/world",
             RelativePath::new("/hello/world").unwrap().path
         );
         assert_eq!(

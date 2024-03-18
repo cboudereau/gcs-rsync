@@ -22,7 +22,7 @@ async fn test_test_config() {
     );
     let name = t.object("object_name").name;
     assert!(
-        name.ends_with("/object_name") || name.ends_with("\\object_name"),
+        name.ends_with("/object_name"),
         "object name should end with /object_name"
     );
 
