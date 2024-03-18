@@ -109,7 +109,10 @@ impl StorageClient {
             });
         }
 
-        let err = response.text().await.map_err(super::Error::GcsHttpError)?;
+        let err = response
+            .text()
+            .await
+            .map_err(super::Error::GcsHttpNoTextError)?;
         Err(super::Error::gcs_unexpected_response_error(url, err))
     }
 
@@ -124,7 +127,10 @@ impl StorageClient {
 
     pub async fn delete(&self, url: &str) -> StorageResult<()> {
         let request = self.with_auth(self.client.client.delete(url)).await?;
-        let response = request.send().await.map_err(super::Error::GcsHttpError)?;
+        let response = request
+            .send()
+            .await
+            .map_err(super::Error::GcsHttpDeleteError)?;
         Self::success_response(url, response).await?;
         Ok(())
     }
@@ -140,7 +146,7 @@ impl StorageClient {
             .body(reqwest::Body::wrap_stream(body))
             .send()
             .await
-            .map_err(super::Error::GcsHttpError)?;
+            .map_err(super::Error::GcsHttpPostError)?;
 
         Self::success_response(url, response).await?;
         Ok(())
@@ -206,7 +212,7 @@ impl StorageClient {
             .body(reqwest::Body::wrap_stream(mbody))
             .send()
             .await
-            .map_err(super::Error::GcsHttpError)?;
+            .map_err(super::Error::GcsHttpPostMultipartError)?;
 
         Self::success_response(url, response).await?;
         Ok(())
@@ -225,12 +231,12 @@ impl StorageClient {
             .query(query)
             .send()
             .await
-            .map_err(super::Error::GcsHttpError)?;
+            .map_err(super::Error::GcsHttpGetAsStreamError)?;
 
         Ok(Self::success_response(url, response)
             .await?
             .bytes_stream()
-            .map_err(super::Error::GcsHttpError))
+            .map_err(super::Error::GcsHttpBytesStreamError))
     }
 
     pub async fn get_as_json<R, Q>(&self, url: &str, query: &Q) -> StorageResult<R>
@@ -241,12 +247,15 @@ impl StorageClient {
         let request = self
             .with_auth(self.client.client.get(url).query(query))
             .await?;
-        let response = request.send().await.map_err(super::Error::GcsHttpError)?;
+        let response = request
+            .send()
+            .await
+            .map_err(super::Error::GcsHttpJsonRequestError)?;
         let r: super::super::DeserializedResponse<R> = Self::success_response(url, response)
             .await?
             .json()
             .await
-            .map_err(super::Error::GcsHttpError)?;
+            .map_err(super::Error::GcsHttpJsonResponseError)?;
         r.into_result()
             .map_err(|err| super::Error::gcs_unexpected_json::<R>(url, err))
     }
