@@ -91,7 +91,14 @@ pub mod credentials {
 #[derive(Debug)]
 pub enum Error {
     GcsTokenError(super::oauth2::Error),
-    GcsHttpError(reqwest::Error),
+    GcsHttpJsonRequestError(reqwest::Error),
+    GcsHttpJsonResponseError(reqwest::Error),
+    GcsHttpBytesStreamError(reqwest::Error),
+    GcsHttpGetAsStreamError(reqwest::Error),
+    GcsHttpPostMultipartError(reqwest::Error),
+    GcsHttpPostError(reqwest::Error),
+    GcsHttpDeleteError(reqwest::Error),
+    GcsHttpNoTextError(reqwest::Error),
     GcsUnexpectedResponse {
         url: String,
         value: String,
