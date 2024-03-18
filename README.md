@@ -55,7 +55,7 @@ docker run --rm -it -v ${GOOGLE_APPLICATION_CREDENTIALS}:/creds.json:ro -v <Your
 An example where any json or toml are included recursively except any test.json or test.toml recursively
 ```bash
 docker run --rm -it -v ${GOOGLE_APPLICATION_CREDENTIALS}:/creds.json:ro -v <YourFolderToDownloadTo>:/dest superbeeeeeee/gcs-rsync -r -m -i **/*.json -i **/*.toml -x **/test.json -x **/test.toml
- gs://<YourBucket>/<YourPrefix> /dest
+ gs://<YourBucket>/YourFolderToUpload>/ /dest
 ```
 
 #### Library
