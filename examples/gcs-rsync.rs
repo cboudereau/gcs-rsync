@@ -40,12 +40,12 @@ struct Opt {
 
     /// Source path: can be either gs (gs://bucket/path/to/object) or fs source
     /// To synchronize only a prefix: gs://bucket/path/to/your/prefix
-    /// To synchronize a full folder: gs://bucket/path/to/your/folder/ with the trailing slash in the end 
+    /// To synchronize a full folder: gs://bucket/path/to/your/folder/ with the trailing slash in the end
     #[structopt()]
     source: String,
 
     /// Destination path: can be either gs (gs://bucket/path/to/object) or fs source
-    /// To synchronize a full folder: gs://bucket/path/to/your/folder/ with the trailing slash in the end 
+    /// To synchronize a full folder: gs://bucket/path/to/your/folder/ with the trailing slash in the end
     #[structopt()]
     dest: String,
 }
