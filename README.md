@@ -46,6 +46,12 @@ docker run --rm -it -v ${GOOGLE_APPLICATION_CREDENTIALS}:/creds.json:ro -v <Your
 docker run --rm -it -v ${GOOGLE_APPLICATION_CREDENTIALS}:/creds.json:ro -v <YourFolderToDownloadTo>:/dest superbeeeeeee/gcs-rsync -r -m gs://<YourBucket>/<YourFolderToUpload>/ /dest
 ```
 
+### Mirror partial gcs with prefix to folder
+
+```bash
+docker run --rm -it -v ${GOOGLE_APPLICATION_CREDENTIALS}:/creds.json:ro -v <YourFolderToDownloadTo>:/dest superbeeeeeee/gcs-rsync -r -m gs://<YourBucket>/<YourFolderToUpload>/<YourPrefix> /dest
+```
+
 ### Include or Exclude files using glob pattern
 
 #### CLI gcs-rsync
