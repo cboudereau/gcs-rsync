@@ -245,6 +245,12 @@ cargo run --release --example upload_object "<YourBucket>" "<YourPrefix>" "<Your
 cargo run --release --example download_object "<YourBucket>" "<YourObjectName>" "<YourAbsoluteExistingDirectory>"
 ```
 
+### Download public object
+
+```bash
+cargo run --release --example download_public_object "<YourBucket>" "<YourObjectName>" "<YourAbsoluteExistingDirectory>"
+```
+
 ### Delete object
 
 ```bash

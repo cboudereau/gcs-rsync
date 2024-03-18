@@ -8,24 +8,22 @@ use futures::{
     stream,
     stream::{Stream, StreamExt, TryStream, TryStreamExt},
 };
+use reqwest::RequestBuilder;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::RwLock;
 
 #[derive(Debug)]
-pub(super) struct StorageClient {
+struct TokenStateHolder {
     client: Client,
     token_generator: Box<dyn TokenGenerator>,
     token: RwLock<Token>,
 }
 
-const MT_SEPARATOR: &[u8] = b"--gcs-storage\n";
-const MT_END_SEPARATOR: &[u8] = b"\n--gcs-storage--";
-const MT_CONTENT_TYPE: &[u8] = b"Content-Type: application/octet-stream";
-const MT_METADATA_TYPE: &[u8] = b"Content-Type: application/json; charset=utf-8\n\n";
-
-impl StorageClient {
-    pub async fn new(token_generator: Box<dyn TokenGenerator>) -> StorageResult<Self> {
-        let client = Client::default();
+impl TokenStateHolder {
+    pub async fn new(
+        client: Client,
+        token_generator: Box<dyn TokenGenerator>,
+    ) -> StorageResult<Self> {
         let token = token_generator
             .get(&client)
             .await
@@ -61,6 +59,40 @@ impl StorageClient {
             Ok(access_token)
         }
     }
+}
+
+#[derive(Debug)]
+pub(super) struct StorageClient {
+    client: Client,
+    token_state_holder: Option<TokenStateHolder>,
+}
+
+const MT_SEPARATOR: &[u8] = b"--gcs-storage\n";
+const MT_END_SEPARATOR: &[u8] = b"\n--gcs-storage--";
+const MT_CONTENT_TYPE: &[u8] = b"Content-Type: application/octet-stream";
+const MT_METADATA_TYPE: &[u8] = b"Content-Type: application/json; charset=utf-8\n\n";
+
+impl StorageClient {
+    pub async fn new(token_generator: Box<dyn TokenGenerator>) -> StorageResult<Self> {
+        let client = Client::default();
+        let token_state_holder =
+            Some(TokenStateHolder::new(client.clone(), token_generator).await?);
+
+        Ok(Self {
+            client,
+            token_state_holder,
+        })
+    }
+
+    pub fn no_auth() -> Self {
+        let client = Client::default();
+        let token_state_holder = None;
+
+        Self {
+            client,
+            token_state_holder,
+        }
+    }
 
     async fn success_response(
         url: &str,
@@ -81,15 +113,18 @@ impl StorageClient {
         Err(super::Error::gcs_unexpected_response_error(url, err))
     }
 
+    async fn with_auth(&self, request_builder: RequestBuilder) -> StorageResult<RequestBuilder> {
+        match &self.token_state_holder {
+            None => Ok(request_builder),
+            Some(token_state_holder) => {
+                Ok(request_builder.bearer_auth(token_state_holder.refresh_token().await?))
+            }
+        }
+    }
+
     pub async fn delete(&self, url: &str) -> StorageResult<()> {
-        let response = self
-            .client
-            .client
-            .delete(url)
-            .bearer_auth(self.refresh_token().await?)
-            .send()
-            .await
-            .map_err(super::Error::GcsHttpError)?;
+        let request = self.with_auth(self.client.client.delete(url)).await?;
+        let response = request.send().await.map_err(super::Error::GcsHttpError)?;
         Self::success_response(url, response).await?;
         Ok(())
     }
@@ -100,11 +135,8 @@ impl StorageClient {
         S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
         bytes::Bytes: From<S::Ok>,
     {
-        let response = self
-            .client
-            .client
-            .post(url)
-            .bearer_auth(self.refresh_token().await?)
+        let request = self.with_auth(self.client.client.post(url)).await?;
+        let response = request
             .body(reqwest::Body::wrap_stream(body))
             .send()
             .await
@@ -166,11 +198,9 @@ impl StorageClient {
         };
 
         // let total_len = part_len as u64 + size + MT_END_SEPARATOR.len() as u64;
-        let response = self
-            .client
-            .client
-            .post(url)
-            .bearer_auth(self.refresh_token().await?)
+        let request = self.client.client.post(url);
+        let request = self.with_auth(request).await?;
+        let response = request
             .header("Content-Type", "multipart/related; boundary=gcs-storage")
             // .header("Content-Length", total_len)
             .body(reqwest::Body::wrap_stream(mbody))
@@ -190,11 +220,8 @@ impl StorageClient {
     where
         Q: Serialize,
     {
-        let response = self
-            .client
-            .client
-            .get(url)
-            .bearer_auth(self.refresh_token().await?)
+        let request = self.with_auth(self.client.client.get(url)).await?;
+        let response = request
             .query(query)
             .send()
             .await
@@ -211,15 +238,10 @@ impl StorageClient {
         R: DeserializeOwned,
         Q: serde::Serialize,
     {
-        let response = self
-            .client
-            .client
-            .get(url)
-            .query(query)
-            .bearer_auth(self.refresh_token().await?)
-            .send()
-            .await
-            .map_err(super::Error::GcsHttpError)?;
+        let request = self
+            .with_auth(self.client.client.get(url).query(query))
+            .await?;
+        let response = request.send().await.map_err(super::Error::GcsHttpError)?;
         let r: super::super::DeserializedResponse<R> = Self::success_response(url, response)
             .await?
             .json()

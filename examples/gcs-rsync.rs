@@ -5,7 +5,7 @@ use gcs_rsync::{
     oauth2::token::TokenGenerator,
     storage::{
         credentials::{authorizeduser, metadata},
-        Object,
+        Error, StorageResult,
     },
     sync::{RSync, RSyncError, RSyncResult, Source},
 };
@@ -47,23 +47,67 @@ struct Opt {
     dest: String,
 }
 
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BucketPrefix {
+    pub bucket: String,
+    pub prefix: String,
+}
+
+impl FromStr for BucketPrefix {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.strip_prefix("gs://")
+            .and_then(|part| part.split_once('/'))
+            .ok_or(Error::GcsInvalidUrl {
+                url: s.to_owned(),
+                message: "gs url should be gs://bucket/object/path/name".to_owned(),
+            })
+            .and_then(|(bucket, prefix)| BucketPrefix::new(bucket, prefix))
+    }
+}
+
+impl BucketPrefix {
+    pub fn new(bucket: &str, prefix: &str) -> StorageResult<Self> {
+        if bucket.is_empty() {
+            return Err(Error::GcsInvalidObjectName);
+        }
+
+        Ok(Self {
+            bucket: bucket.to_owned(),
+            prefix: prefix.to_owned(),
+        })
+    }
+}
+
 async fn get_source(
     path: &str,
     is_dest: bool,
     use_metadata_token_api: bool,
 ) -> RSyncResult<Source> {
-    match Object::from_str(path).ok() {
+    match BucketPrefix::from_str(path).ok() {
         Some(o) => {
-            let token_generator: Box<dyn TokenGenerator> = if use_metadata_token_api {
-                Box::new(metadata::default().map_err(RSyncError::StorageError)?)
+            let token_generator: Option<Box<dyn TokenGenerator>> = if use_metadata_token_api {
+                Some(Box::new(
+                    metadata::default().map_err(RSyncError::StorageError)?,
+                ))
             } else {
-                Box::new(
-                    authorizeduser::default()
-                        .await
-                        .map_err(RSyncError::StorageError)?,
-                )
+                let token_generator = authorizeduser::default().await;
+                match token_generator {
+                    Err(_) => {
+                        println!("no default auth found, running gcs-rsync without auth");
+                        None
+                    }
+                    Ok(o) => Some(Box::new(o)),
+                }
             };
-            Source::gcs(token_generator, o.bucket.as_str(), o.name.as_str()).await
+            let bucket = o.bucket.as_str();
+            let prefix = o.prefix.as_str();
+            match token_generator {
+                None => Ok(Source::gcs_no_auth(bucket, prefix)),
+                Some(token_generator) => Source::gcs(token_generator, bucket, prefix).await,
+            }
         }
         None => {
             let path = Path::new(path);
@@ -81,7 +125,6 @@ async fn main() -> RSyncResult<()> {
     let num_cpus = num_cpus::get();
 
     let opt = Opt::from_args();
-
     let source = get_source(&opt.source, false, opt.use_metadata_token_api).await?;
     let dest = get_source(&opt.dest, true, opt.use_metadata_token_api).await?;
 
@@ -125,6 +168,5 @@ async fn main() -> RSyncResult<()> {
             })
             .await;
     };
-
     Ok(())
 }
