@@ -20,7 +20,7 @@ Cargo.toml
 
 ```bash
 [dependencies]
-gcs-rsync = "0.3"
+gcs-rsync = "0.4"
 ```
 
 ## How to install as cli tool
