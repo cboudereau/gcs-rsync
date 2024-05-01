@@ -26,12 +26,14 @@ pub struct Token {
 
 const ONE_SECOND_TO_MICROSECONDS: i64 = 1_000_000;
 
-fn from_expires_in<'de, D>(deserializer: D) -> std::result::Result<DateTime<Utc>, D::Error>
+pub(super) fn from_expires_in<'de, D>(
+    deserializer: D,
+) -> std::result::Result<DateTime<Utc>, D::Error>
 where
     D: Deserializer<'de>,
 {
     let expires_in: i64 = Deserialize::deserialize(deserializer)?;
-    Ok(Utc::now() + chrono::Duration::microseconds(expires_in * 1000_1000))
+    Ok(Utc::now() + chrono::Duration::microseconds(expires_in * ONE_SECOND_TO_MICROSECONDS))
 }
 
 impl Display for Token {
