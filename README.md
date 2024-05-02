@@ -14,7 +14,7 @@ gcs-rsync is faster than [gsutil rsync](https://cloud.google.com/storage/docs/gs
 
 no hard limit to 32K objects or specific conf to compute state.
 
-This crate can be used as a library or CLI. The API down manage objects (download, upload, delete, ...) can be used independently.
+This crate can be used as a library or CLI. The API managing objects (download, upload, delete, ...) can be used independently.
 
 ## How to install as crate
 
