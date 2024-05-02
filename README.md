@@ -485,7 +485,7 @@ async fn main() -> StorageResult<()> {
 GOOGLE_APPLICATION_CREDENTIALS=<PathToJson> cargo r --release --example list_objects_service_account "<YourBucket>" "<YourPrefix>"
 ```
 
-### List objects
+#### List lots of (>32K) objects
 
 list a bucket having more than 60K objects
 
