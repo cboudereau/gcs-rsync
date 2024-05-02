@@ -31,7 +31,7 @@ where
     D: Deserializer<'de>,
 {
     let expires_in: i64 = Deserialize::deserialize(deserializer)?;
-    Ok(Utc::now() + chrono::Duration::microseconds(expires_in * 1000_1000))
+    Ok(Utc::now() + chrono::Duration::microseconds(expires_in * ONE_SECOND_TO_MICROSECONDS))
 }
 
 impl Display for Token {
