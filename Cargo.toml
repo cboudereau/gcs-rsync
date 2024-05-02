@@ -1,6 +1,6 @@
 [package]
 name = "gcs-rsync"
-version = "0.4.2"
+version = "0.4.3"
 edition = "2021"
 description = "rsync support for gcs with higher perf than gsutil rsync"
 license = "MIT"
