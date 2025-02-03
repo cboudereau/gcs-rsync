@@ -64,27 +64,18 @@ jobs:
           override: true
           components: llvm-tools-preview
 
-      # - name: Install grcov
-      #   run: cargo install grcov
-
       - name: Download grcov
         run: |
           mkdir -p "${HOME}/.local/bin"
           if [ "$RUNNER_OS" == "Windows" ]; then
-            curl -sL https://github.com/mozilla/grcov/releases/download/v0.8.20/grcov-x86_64-pc-windows-msvc.zip -o temp.zip
-            unzip temp.zip -d "${HOME}/.local/bin"
-            rm temp.zip
+            cargo install grcov
           else
             curl -sL https://github.com/mozilla/grcov/releases/download/v0.8.20/grcov-x86_64-unknown-linux-gnu.tar.bz2 | tar jxf - -C "${HOME}/.local/bin"
           fi
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-          echo "----debug----"
-          printenv
-          ls -la $HOME/.local/bin
-
       - name: Coverage 
-        run: type grcov && grcov --help && cargo run --manifest-path ./xtask/Cargo.toml -- coverage
+        run: cargo run --manifest-path ./xtask/Cargo.toml -- coverage
 
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v5
