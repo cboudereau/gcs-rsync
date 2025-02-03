@@ -84,12 +84,7 @@ jobs:
       #     ls -la $HOME/.local/bin
 
       - name: Coverage 
-        run: |
-          echo "----debug----"
-          printenv
-          ls -la $HOME/.local/bin
-
-          type grcov && cargo run --manifest-path ./xtask/Cargo.toml -- coverage
+        run: type grcov && cargo run --manifest-path ./xtask/Cargo.toml -- coverage
 
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v5
