@@ -310,7 +310,7 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
             updated("different size or mtime", "hello/world/test.txt"),
             updated("different size or mtime", "test.json"),
         ];
-    
+
         assert_eq!(expected, sync(&rsync_fs_to_fs_replica).await);
         assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
     }
