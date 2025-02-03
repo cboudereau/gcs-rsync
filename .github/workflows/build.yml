@@ -80,6 +80,7 @@ jobs:
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Coverage 
+        shell: bash
         run: cargo run --manifest-path ./xtask/Cargo.toml -- coverage
 
       - name: Upload to codecov.io
