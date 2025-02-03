@@ -349,9 +349,11 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
 }
 
 async fn test_include_and_exclude_rsync_conf_base(
-    expected: Vec<RSyncStatus>,
+    file_names: &[&str],
+    content: &str,
     includes: &[&str],
     excludes: &[&str],
+    expected: Vec<RSyncStatus>,
 ) {
     async fn generate_gcs(test_config: GcsTestConfig) -> Source {
         let bucket = test_config.bucket();
@@ -368,16 +370,12 @@ async fn test_include_and_exclude_rsync_conf_base(
 
     let fs = FsTestConfig::new();
 
-    let file_names = vec![
-        "/hello/world/test.txt",
-        "test.json",
-        "a/long/path/hello_world.toml",
-    ]
-    .into_iter()
-    .map(|x| fs.file_path(x))
-    .collect::<Vec<_>>();
+    let file_names = file_names
+        .into_iter()
+        .map(|x| fs.file_path(x))
+        .collect::<Vec<_>>();
 
-    setup_files(&file_names[..], "Hello World").await;
+    setup_files(&file_names[..], content).await;
 
     let gcs = generate_gcs(GcsTestConfig::from_env().await).await;
     let fs = Source::fs(fs.base_path().as_path());
@@ -388,64 +386,119 @@ async fn test_include_and_exclude_rsync_conf_base(
         .unwrap();
     let actual = sync(&rsync).await;
 
-    assert_eq!(expected, actual);
+    assert_eq!(expected, &actual[..]);
 }
 
 #[tokio::test]
 async fn test_include_rsync_conf() {
-    test_include_and_exclude_rsync_conf_base(
-        vec![created("hello/world/test.txt")],
-        vec![r#"hello/world/test.txt"#].as_slice(),
-        vec![].as_slice(),
-    )
-    .await;
-    test_include_and_exclude_rsync_conf_base(
-        vec![created("hello/world/test.txt")],
-        vec![r#"hello/**/test.txt"#].as_slice(),
-        vec![].as_slice(),
-    )
-    .await;
+    let file_names = vec![
+        "/hello/world/test.txt",
+        "test.json",
+        "a/long/path/hello_world.toml",
+    ];
 
     test_include_and_exclude_rsync_conf_base(
+        file_names.as_slice(),
+        "Hello World",
+        vec![r#"hello/world/test.txt"#].as_slice(),
+        vec![].as_slice(),
         vec![created("hello/world/test.txt")],
+    )
+    .await;
+    test_include_and_exclude_rsync_conf_base(
+        file_names.as_slice(),
+        "Hello World",
+        vec![r#"hello/**/test.txt"#].as_slice(),
+        vec![].as_slice(),
+        vec![created("hello/world/test.txt")],
+    )
+    .await;
+    test_include_and_exclude_rsync_conf_base(
+        file_names.as_slice(),
+        "Hello World",
+        vec![r#"**/test.txt"#].as_slice(),
+        vec![].as_slice(),
+        vec![created("hello/world/test.txt")],
+    )
+    .await;
+    test_include_and_exclude_rsync_conf_base(
+        file_names.as_slice(),
+        "Hello World",
         vec!["*.txt"].as_slice(),
         vec![].as_slice(),
+        vec![created("hello/world/test.txt")],
     )
     .await;
 }
 
 #[tokio::test]
 async fn test_multiple_include_rsync_conf() {
+    let file_names = vec![
+        "/hello/world/test.txt",
+        "test.json",
+        "a/long/path/hello_world.toml",
+    ];
+
     test_include_and_exclude_rsync_conf_base(
-        vec![created("hello/world/test.txt"), created("test.json")],
+        file_names.as_slice(),
+        "Hello World",
         vec![r#"hello/**/test.txt"#, "test.json"].as_slice(),
         vec![].as_slice(),
+        vec![created("hello/world/test.txt"), created("test.json")],
     )
     .await;
 }
 
 #[tokio::test]
 async fn test_exclude_all_rsync_conf() {
-    test_include_and_exclude_rsync_conf_base(vec![], vec![].as_slice(), vec!["**"].as_slice())
-        .await;
+    let file_names = vec![
+        "/hello/world/test.txt",
+        "test.json",
+        "a/long/path/hello_world.toml",
+    ];
+
+    test_include_and_exclude_rsync_conf_base(
+        file_names.as_slice(),
+        "Hello World",
+        vec![].as_slice(),
+        vec!["**"].as_slice(),
+        vec![],
+    )
+    .await;
 }
 
 #[tokio::test]
 async fn test_exclude_rsync_conf() {
+    let file_names = vec![
+        "/hello/world/test.txt",
+        "test.json",
+        "a/long/path/hello_world.toml",
+    ];
+
     test_include_and_exclude_rsync_conf_base(
-        vec![created("a/long/path/hello_world.toml")],
+        file_names.as_slice(),
+        "Hello World",
         vec![].as_slice(),
         vec!["*test.*"].as_slice(),
+        vec![created("a/long/path/hello_world.toml")],
     )
     .await;
 }
 
 #[tokio::test]
 async fn test_exclude_multiple_rsync_conf() {
+    let file_names = vec![
+        "/hello/world/test.txt",
+        "test.json",
+        "a/long/path/hello_world.toml",
+    ];
+
     test_include_and_exclude_rsync_conf_base(
-        vec![created("test.json")],
+        file_names.as_slice(),
+        "Hello World",
         vec![].as_slice(),
         vec!["a/**/hello_world.toml", "hello/**/test.*"].as_slice(),
+        vec![created("test.json")],
     )
     .await;
 }
