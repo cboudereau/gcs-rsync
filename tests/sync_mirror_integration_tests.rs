@@ -384,7 +384,7 @@ async fn test_include_and_exclude_rsync_conf_base(
         .unwrap();
     let actual = sync(&rsync).await;
 
-    assert_eq!(expected, &actual[..]);
+    assert_eq!(expected, actual);
 }
 
 #[tokio::test]
