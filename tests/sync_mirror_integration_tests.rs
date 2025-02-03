@@ -280,8 +280,13 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
         assert_eq!(expected, sync(&rsync_fs_to_fs_replica).await);
         assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
     } else {
-        sync(&rsync_fs_to_fs_replica).await;
-        sync(&rsync_gs_to_fs_replica).await;
+        let expected = vec![
+            updated("different size or mtime", "a/long/path/hello_world.toml"),
+            updated("different size or mtime", "hello/world/test.txt"),
+            updated("different size or mtime", "test.json"),
+        ];
+        assert_eq!(expected, sync(&rsync_fs_to_fs_replica).await);
+        assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
     }
 
     write_to_file(src_t.file_path("test.json").as_path(), "updated").await;
@@ -299,8 +304,15 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
         assert_eq!(expected, sync(&rsync_fs_to_fs_replica).await);
         assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
     } else {
-        sync(&rsync_fs_to_fs_replica).await;
-        sync(&rsync_gs_to_fs_replica).await;
+        let expected = vec![
+            created("new.json"),
+            updated("different size or mtime", "a/long/path/hello_world.toml"),
+            updated("different size or mtime", "hello/world/test.txt"),
+            updated("different size or mtime", "test.json"),
+        ];
+    
+        assert_eq!(expected, sync(&rsync_fs_to_fs_replica).await);
+        assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
     }
 
     delete_files(&file_names[..]).await;
@@ -317,8 +329,15 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
         assert_eq!(expected, mirror(&rsync_fs_to_fs_replica).await);
         assert_eq!(expected, mirror(&rsync_gs_to_fs_replica).await);
     } else {
-        mirror(&rsync_fs_to_fs_replica).await;
-        mirror(&rsync_gs_to_fs_replica).await;
+        let expected = vec![
+            synced(updated("different size or mtime", "new.json")),
+            deleted("a/long/path/hello_world.toml"),
+            deleted("hello/world/test.txt"),
+            deleted("test.json"),
+            not_deleted("new.json"),
+        ];
+        assert_eq!(expected, mirror(&rsync_fs_to_fs_replica).await);
+        assert_eq!(expected, mirror(&rsync_gs_to_fs_replica).await);
     }
 
     delete_file(new_file.as_path()).await;
