@@ -371,7 +371,7 @@ async fn test_include_and_exclude_rsync_conf_base(
     let fs = FsTestConfig::new();
 
     let file_names = file_names
-        .into_iter()
+        .iter()
         .map(|x| fs.file_path(x))
         .collect::<Vec<_>>();
 
