@@ -8,39 +8,8 @@ use gcs_rsync::{
 };
 use tokio::io::AsyncWriteExt;
 
-struct FsTestConfig {
-    base_path: PathBuf,
-}
-
 mod config;
-use config::gcs::GcsTestConfig;
-
-impl FsTestConfig {
-    fn new() -> Self {
-        let base_path = {
-            let uuid = uuid::Uuid::new_v4().hyphenated().to_string();
-            let mut tmp = std::env::temp_dir();
-            tmp.push("rsync_integration_tests");
-            tmp.push(uuid);
-            tmp
-        };
-        Self { base_path }
-    }
-
-    fn file_path(&self, file_name: &str) -> PathBuf {
-        let mut p = self.base_path.clone();
-        let file_name = file_name.strip_prefix('/').unwrap_or(file_name);
-        p.push(file_name);
-        p
-    }
-}
-
-impl Drop for FsTestConfig {
-    fn drop(&mut self) {
-        let path = self.base_path.as_path();
-        std::fs::remove_dir_all(path).unwrap();
-    }
-}
+use config::{fs::FsTestConfig, gcs::GcsTestConfig};
 
 async fn get_service_account() -> ServiceAccountCredentials {
     let path = env!("TEST_SERVICE_ACCOUNT");
@@ -273,14 +242,14 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
 
     let gcs_dest = generate_gcs(gcs_dst_t).await;
 
-    let fs_source = Source::fs(src_t.base_path.as_path());
-    let fs_source_replica = Source::fs(src_t.base_path.as_path());
+    let fs_source = Source::fs(src_t.base_path().as_path());
+    let fs_source_replica = Source::fs(src_t.base_path().as_path());
 
     let fs_replica_t = FsTestConfig::new();
-    let fs_dest_replica = Source::fs(fs_replica_t.base_path.as_path());
+    let fs_dest_replica = Source::fs(fs_replica_t.base_path().as_path());
 
     let fs_replica_t2 = FsTestConfig::new();
-    let fs_dest_replica2 = Source::fs(fs_replica_t2.base_path.as_path());
+    let fs_dest_replica2 = Source::fs(fs_replica_t2.base_path().as_path());
 
     let rsync_fs_to_gcs = RSync::new(fs_source, gcs_dest).with_restore_fs_mtime(set_fs_mtime);
     let rsync_gcs_to_gcs_replica =
@@ -307,13 +276,18 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
     ];
     assert_eq!(expected, sync(&rsync_fs_to_gcs).await);
     assert_eq!(expected, sync(&rsync_gcs_to_gcs_replica).await);
-    if set_fs_mtime {
-        assert_eq!(expected, sync(&rsync_fs_to_fs_replica).await);
-        assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
+
+    let expected = if set_fs_mtime {
+        expected
     } else {
-        sync(&rsync_fs_to_fs_replica).await;
-        sync(&rsync_gs_to_fs_replica).await;
-    }
+        vec![
+            updated("different size or mtime", "a/long/path/hello_world.toml"),
+            updated("different size or mtime", "hello/world/test.txt"),
+            updated("different size or mtime", "test.json"),
+        ]
+    };
+    assert_eq!(expected, sync(&rsync_fs_to_fs_replica).await);
+    assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
 
     write_to_file(src_t.file_path("test.json").as_path(), "updated").await;
     let new_file = src_t.file_path("new.json");
@@ -326,13 +300,18 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
     ];
     assert_eq!(expected, sync(&rsync_fs_to_gcs).await);
     assert_eq!(expected, sync(&rsync_gcs_to_gcs_replica).await);
-    if set_fs_mtime {
-        assert_eq!(expected, sync(&rsync_fs_to_fs_replica).await);
-        assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
+    let expected = if set_fs_mtime {
+        expected
     } else {
-        sync(&rsync_fs_to_fs_replica).await;
-        sync(&rsync_gs_to_fs_replica).await;
-    }
+        vec![
+            created("new.json"),
+            updated("different size or mtime", "a/long/path/hello_world.toml"),
+            updated("different size or mtime", "hello/world/test.txt"),
+            updated("different size or mtime", "test.json"),
+        ]
+    };
+    assert_eq!(expected, sync(&rsync_fs_to_fs_replica).await);
+    assert_eq!(expected, sync(&rsync_gs_to_fs_replica).await);
 
     delete_files(&file_names[..]).await;
     let expected = vec![
@@ -344,13 +323,20 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
     ];
     assert_eq!(expected, mirror(&rsync_fs_to_gcs).await);
     assert_eq!(expected, mirror(&rsync_gcs_to_gcs_replica).await);
-    if set_fs_mtime {
-        assert_eq!(expected, mirror(&rsync_fs_to_fs_replica).await);
-        assert_eq!(expected, mirror(&rsync_gs_to_fs_replica).await);
+
+    let expected = if set_fs_mtime {
+        expected
     } else {
-        mirror(&rsync_fs_to_fs_replica).await;
-        mirror(&rsync_gs_to_fs_replica).await;
-    }
+        vec![
+            synced(updated("different size or mtime", "new.json")),
+            deleted("a/long/path/hello_world.toml"),
+            deleted("hello/world/test.txt"),
+            deleted("test.json"),
+            not_deleted("new.json"),
+        ]
+    };
+    assert_eq!(expected, mirror(&rsync_fs_to_fs_replica).await);
+    assert_eq!(expected, mirror(&rsync_gs_to_fs_replica).await);
 
     delete_file(new_file.as_path()).await;
     let expected = vec![deleted("new.json")];
@@ -361,9 +347,11 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
 }
 
 async fn test_include_and_exclude_rsync_conf_base(
-    expected: Vec<RSyncStatus>,
+    file_names: &[&str],
+    content: &str,
     includes: &[&str],
     excludes: &[&str],
+    expected: Vec<RSyncStatus>,
 ) {
     async fn generate_gcs(test_config: GcsTestConfig) -> Source {
         let bucket = test_config.bucket();
@@ -380,19 +368,15 @@ async fn test_include_and_exclude_rsync_conf_base(
 
     let fs = FsTestConfig::new();
 
-    let file_names = vec![
-        "/hello/world/test.txt",
-        "test.json",
-        "a/long/path/hello_world.toml",
-    ]
-    .into_iter()
-    .map(|x| fs.file_path(x))
-    .collect::<Vec<_>>();
+    let file_names = file_names
+        .iter()
+        .map(|x| fs.file_path(x))
+        .collect::<Vec<_>>();
 
-    setup_files(&file_names[..], "Hello World").await;
+    setup_files(&file_names[..], content).await;
 
     let gcs = generate_gcs(GcsTestConfig::from_env().await).await;
-    let fs = Source::fs(fs.base_path.as_path());
+    let fs = Source::fs(fs.base_path().as_path());
     let rsync = RSync::new(fs, gcs)
         .with_includes(includes)
         .unwrap()
@@ -400,64 +384,119 @@ async fn test_include_and_exclude_rsync_conf_base(
         .unwrap();
     let actual = sync(&rsync).await;
 
-    assert_eq!(expected, actual);
+    assert_eq!(expected, &actual[..]);
 }
 
 #[tokio::test]
 async fn test_include_rsync_conf() {
-    test_include_and_exclude_rsync_conf_base(
-        vec![created("hello/world/test.txt")],
-        vec![r#"hello/world/test.txt"#].as_slice(),
-        vec![].as_slice(),
-    )
-    .await;
-    test_include_and_exclude_rsync_conf_base(
-        vec![created("hello/world/test.txt")],
-        vec![r#"hello/**/test.txt"#].as_slice(),
-        vec![].as_slice(),
-    )
-    .await;
+    let file_names = vec![
+        "/hello/world/test.txt",
+        "test.json",
+        "a/long/path/hello_world.toml",
+    ];
 
     test_include_and_exclude_rsync_conf_base(
+        file_names.as_slice(),
+        "Hello World",
+        vec![r#"hello/world/test.txt"#].as_slice(),
+        vec![].as_slice(),
         vec![created("hello/world/test.txt")],
+    )
+    .await;
+    test_include_and_exclude_rsync_conf_base(
+        file_names.as_slice(),
+        "Hello World",
+        vec![r#"hello/**/test.txt"#].as_slice(),
+        vec![].as_slice(),
+        vec![created("hello/world/test.txt")],
+    )
+    .await;
+    test_include_and_exclude_rsync_conf_base(
+        file_names.as_slice(),
+        "Hello World",
+        vec![r#"**/test.txt"#].as_slice(),
+        vec![].as_slice(),
+        vec![created("hello/world/test.txt")],
+    )
+    .await;
+    test_include_and_exclude_rsync_conf_base(
+        file_names.as_slice(),
+        "Hello World",
         vec!["*.txt"].as_slice(),
         vec![].as_slice(),
+        vec![created("hello/world/test.txt")],
     )
     .await;
 }
 
 #[tokio::test]
 async fn test_multiple_include_rsync_conf() {
+    let file_names = vec![
+        "/hello/world/test.txt",
+        "test.json",
+        "a/long/path/hello_world.toml",
+    ];
+
     test_include_and_exclude_rsync_conf_base(
-        vec![created("hello/world/test.txt"), created("test.json")],
+        file_names.as_slice(),
+        "Hello World",
         vec![r#"hello/**/test.txt"#, "test.json"].as_slice(),
         vec![].as_slice(),
+        vec![created("hello/world/test.txt"), created("test.json")],
     )
     .await;
 }
 
 #[tokio::test]
 async fn test_exclude_all_rsync_conf() {
-    test_include_and_exclude_rsync_conf_base(vec![], vec![].as_slice(), vec!["**"].as_slice())
-        .await;
+    let file_names = vec![
+        "/hello/world/test.txt",
+        "test.json",
+        "a/long/path/hello_world.toml",
+    ];
+
+    test_include_and_exclude_rsync_conf_base(
+        file_names.as_slice(),
+        "Hello World",
+        vec![].as_slice(),
+        vec!["**"].as_slice(),
+        vec![],
+    )
+    .await;
 }
 
 #[tokio::test]
 async fn test_exclude_rsync_conf() {
+    let file_names = vec![
+        "/hello/world/test.txt",
+        "test.json",
+        "a/long/path/hello_world.toml",
+    ];
+
     test_include_and_exclude_rsync_conf_base(
-        vec![created("a/long/path/hello_world.toml")],
+        file_names.as_slice(),
+        "Hello World",
         vec![].as_slice(),
         vec!["*test.*"].as_slice(),
+        vec![created("a/long/path/hello_world.toml")],
     )
     .await;
 }
 
 #[tokio::test]
 async fn test_exclude_multiple_rsync_conf() {
+    let file_names = vec![
+        "/hello/world/test.txt",
+        "test.json",
+        "a/long/path/hello_world.toml",
+    ];
+
     test_include_and_exclude_rsync_conf_base(
-        vec![created("test.json")],
+        file_names.as_slice(),
+        "Hello World",
         vec![].as_slice(),
         vec!["a/**/hello_world.toml", "hello/**/test.*"].as_slice(),
+        vec![created("test.json")],
     )
     .await;
 }
@@ -490,7 +529,7 @@ async fn test_mirror_include_and_exclude_rsync_conf() {
     .await
     .unwrap();
 
-    let fs_rw = Source::fs(fs.base_path.as_path());
+    let fs_rw = Source::fs(fs.base_path().as_path());
     let rsync = RSync::new(fs_rw, gcs_rw);
     let actual = sync(&rsync).await;
 
@@ -510,7 +549,7 @@ async fn test_mirror_include_and_exclude_rsync_conf() {
     .await
     .unwrap();
 
-    let fs_rw = Source::fs(fs.base_path.as_path());
+    let fs_rw = Source::fs(fs.base_path().as_path());
     let rsync = RSync::new(fs_rw, gcs_rw)
         .with_excludes(vec!["*.json"].as_slice())
         .unwrap();
