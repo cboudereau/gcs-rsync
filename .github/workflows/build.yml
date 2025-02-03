@@ -45,6 +45,7 @@ jobs:
     env:
       GOOGLE_APPLICATION_CREDENTIALS_TOKEN: ${{ secrets.TEST_GOOGLE_APPLICATION_CREDENTIALS_TOKEN }} 
       TEST_SERVICE_ACCOUNT_TOKEN: ${{ secrets.TEST_SERVICE_ACCOUNT_TOKEN }} 
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }} 
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
