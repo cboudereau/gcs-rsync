@@ -76,7 +76,9 @@ jobs:
         shell: bash
         run: |
           mkdir -p "${HOME}/.local/bin"
-          curl -sL https://github.com/mozilla/grcov/releases/download/v0.8.20/grcov-x86_64-pc-windows-msvc.zip | unzip - -d "${HOME}/.local/bin"
+          curl -sL https://github.com/mozilla/grcov/releases/download/v0.8.20/grcov-x86_64-pc-windows-msvc.zip -o temp.zip
+          unzip temp.zip -d "${HOME}/.local/bin"
+          rm temp.zip
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Coverage 
