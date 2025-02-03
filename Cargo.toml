@@ -24,7 +24,7 @@ reqwest = { version = "0.12", default-features = false, features = [
     "json",
     "stream",
 ] }
-futures = { version = "0.3", default_features = false, features = ["alloc"] }
+futures = { version = "0.3", default-features = false, features = ["alloc"] }
 jsonwebtoken = "9.3"
 async-trait = "0.1"
 percent-encoding = { version = "2", default-features = false }
