@@ -64,8 +64,18 @@ jobs:
           override: true
           components: llvm-tools-preview
 
-      - name: Install grcov
-        run: cargo install grcov
+      # - name: Install grcov
+      #   run: cargo install grcov
+
+      - name: Download grcov
+        run: |
+          mkdir -p "${HOME}/.local/bin"
+          curl -sL https://github.com/mozilla/grcov/releases/download/v0.8.20/grcov-x86_64-unknown-linux-gnu.tar.bz2 | tar jxf - -C "${HOME}/.local/bin"
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+          echo "----debug----"
+          printenv
+          ls -la $HOME/.local/bin
 
       # - name: Download grcov
       #   run: |
