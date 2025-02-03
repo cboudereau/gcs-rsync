@@ -46,16 +46,17 @@ jobs:
       GOOGLE_APPLICATION_CREDENTIALS_TOKEN: ${{ secrets.TEST_GOOGLE_APPLICATION_CREDENTIALS_TOKEN }}
       TEST_SERVICE_ACCOUNT_TOKEN: ${{ secrets.TEST_SERVICE_ACCOUNT_TOKEN }} 
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v3
 
       - name: Setup test default token
         run: 'echo "$GOOGLE_APPLICATION_CREDENTIALS_TOKEN" > default_token.json'
-        shell: bash
 
       - name: Setup test service_account token
         run: 'echo "$TEST_SERVICE_ACCOUNT_TOKEN" > service_account.json'
-        shell: bash
 
       - uses: actions-rs/toolchain@v1
         with:
@@ -63,25 +64,25 @@ jobs:
           override: true
           components: llvm-tools-preview
 
-      - name: Integration tests (Windows only/no coverage)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: cargo test
-
       - name: Download grcov
-        if: runner.os == 'Linux'
         run: |
-            mkdir -p "${HOME}/.local/bin"
-            curl -sL https://github.com/mozilla/grcov/releases/download/v0.8.20/grcov-x86_64-unknown-linux-gnu.tar.bz2 | tar jxf - -C "${HOME}/.local/bin"
+            if [ "$RUNNER_OS" == "Windows" ]; then
+              curl -sL https://github.com/mozilla/grcov/releases/download/v0.8.20/grcov-x86_64-pc-windows-msvc.zip -o temp.zip
+              unzip temp.zip -d "${HOME}/.local/bin"
+              rm temp.zip
+            else
+              mkdir -p "${HOME}/.local/bin"
+              curl -sL https://github.com/mozilla/grcov/releases/download/v0.8.20/grcov-x86_64-unknown-linux-gnu.tar.bz2 | tar jxf - -C "${HOME}/.local/bin"
+            fi
             echo "$HOME/.local/bin" >> $GITHUB_PATH
+            ls -la $HOME/.local/bin
 
       - name: Coverage 
-        if: runner.os == 'Linux'
-        run: cargo run --manifest-path ./xtask/Cargo.toml -- coverage
+        run: type grcov && cargo run --manifest-path ./xtask/Cargo.toml -- coverage
 
       - name: Upload to codecov.io
-        if: runner.os == 'Linux'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage/*.lcov
+          flags: ${{ runner.os }}
