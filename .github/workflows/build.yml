@@ -64,28 +64,24 @@ jobs:
           override: true
           components: llvm-tools-preview
 
-      - name: Download grcov (Linux)
+      - name: Integration tests (Windows only/no coverage)
+        if: runner.os == 'Windows'
+        run: cargo test
+
+      - name: Download grcov
         if: runner.os == 'Linux'
         run: |
-          mkdir -p "${HOME}/.local/bin"
-          curl -sL https://github.com/mozilla/grcov/releases/download/v0.8.20/grcov-x86_64-unknown-linux-gnu.tar.bz2 | tar jxf - -C "${HOME}/.local/bin"
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Download grcov (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          mkdir -p "${HOME}/.local/bin"
-          curl -sL https://github.com/mozilla/grcov/releases/download/v0.8.20/grcov-x86_64-pc-windows-msvc.zip -o temp.zip
-          unzip temp.zip -d "${HOME}/.local/bin"
-          rm temp.zip
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+            mkdir -p "${HOME}/.local/bin"
+            curl -sL https://github.com/mozilla/grcov/releases/download/v0.8.20/grcov-x86_64-unknown-linux-gnu.tar.bz2 | tar jxf - -C "${HOME}/.local/bin"
+            echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Coverage 
+        if: runner.os == 'Linux'
         shell: bash
         run: cargo run --manifest-path ./xtask/Cargo.toml -- coverage
 
       - name: Upload to codecov.io
+        if: runner.os == 'Linux'
         uses: codecov/codecov-action@v3
         with:
           files: coverage/*.lcov
