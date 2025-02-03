@@ -1,6 +1,6 @@
 # gcs-rsync
 
-[![build](https://github.com/cboudereau/gcs-rsync/workflows/build/badge.svg?branch=main&event=push)](https://github.com/cboudereau/gcs-rsync/actions/workflows/build.yml?query=event%3Apush)
+[![build](https://github.com/cboudereau/gcs-rsync/workflows/build/badge.svg)](https://github.com/cboudereau/gcs-rsync/actions/workflows/build.yml?query=event%3Apush)
 [![codecov](https://codecov.io/gh/cboudereau/gcs-rsync/branch/main/graph/badge.svg?token=AA168CFNFQ)](https://codecov.io/gh/cboudereau/gcs-rsync)
 [![License:MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![docs.rs](https://docs.rs/gcs-rsync/badge.svg)](https://docs.rs/gcs-rsync)
