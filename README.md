@@ -69,6 +69,9 @@ docker run --rm -it -v ${GOOGLE_APPLICATION_CREDENTIALS}:/creds.json:ro -v <Your
 #### Library
 ```with_includes``` and ```with_excludes``` client builders are used to fill includes and excludes glob patterns.
 
+## Testing
+By configuring the env var `STORAGE_EMULATOR_HOST` (defaulted to `https://storage.googleapis.com`), a gcs emulator can be configured to work properly with this library. 
+
 ## Benchmark
 
 Important note about gsutil: The `gsutil ls` command does not list all object items by default but instead list all prefixes while adding the `-r` flag slowdown `gsutil` performance. The `ls` performance command is very different to the `rsync` implementation.
