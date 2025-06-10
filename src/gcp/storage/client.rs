@@ -141,7 +141,9 @@ impl StorageClient {
 
     pub async fn delete(&self, url: &str) -> StorageResult<()> {
         let url = self.resolve_url(url);
-        let request = self.with_auth(self.client.client.delete(url.as_str())).await?;
+        let request = self
+            .with_auth(self.client.client.delete(url.as_str()))
+            .await?;
         let response = request
             .send()
             .await
@@ -157,7 +159,9 @@ impl StorageClient {
         bytes::Bytes: From<S::Ok>,
     {
         let url = self.resolve_url(url);
-        let request = self.with_auth(self.client.client.post(url.as_str())).await?;
+        let request = self
+            .with_auth(self.client.client.post(url.as_str()))
+            .await?;
         let response = request
             .body(reqwest::Body::wrap_stream(body))
             .send()
@@ -273,11 +277,12 @@ impl StorageClient {
             .send()
             .await
             .map_err(super::Error::GcsHttpJsonRequestError)?;
-        let r: super::super::DeserializedResponse<R> = Self::success_response(url.as_str(), response)
-            .await?
-            .json()
-            .await
-            .map_err(super::Error::GcsHttpJsonResponseError)?;
+        let r: super::super::DeserializedResponse<R> =
+            Self::success_response(url.as_str(), response)
+                .await?
+                .json()
+                .await
+                .map_err(super::Error::GcsHttpJsonResponseError)?;
         r.into_result()
             .map_err(|err| super::Error::gcs_unexpected_json::<R>(url.as_str(), err))
     }

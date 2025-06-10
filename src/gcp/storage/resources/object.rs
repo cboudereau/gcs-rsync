@@ -299,10 +299,7 @@ mod tests {
     #[test]
     fn test_object_url() {
         let o = Object::new("hello/hello", "world/world").unwrap();
-        assert_eq!(
-            "storage/v1/b/hello%2Fhello/o/world%2Fworld",
-            o.url()
-        );
+        assert_eq!("storage/v1/b/hello%2Fhello/o/world%2Fworld", o.url());
     }
 
     #[test]
@@ -317,10 +314,7 @@ mod tests {
     #[test]
     fn test_bucket_url() {
         let b = Bucket::new("hello/hello");
-        assert_eq!(
-            "storage/v1/b/hello%2Fhello/o",
-            b.url()
-        );
+        assert_eq!("storage/v1/b/hello%2Fhello/o", b.url());
     }
 
     #[test]
