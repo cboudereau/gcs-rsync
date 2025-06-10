@@ -65,6 +65,7 @@ impl TokenStateHolder {
 pub(super) struct StorageClient {
     client: Client,
     token_state_holder: Option<TokenStateHolder>,
+    host: String,
 }
 
 const MT_SEPARATOR: &[u8] = b"--gcs-storage\n";
@@ -73,24 +74,32 @@ const MT_CONTENT_TYPE: &[u8] = b"Content-Type: application/octet-stream";
 const MT_METADATA_TYPE: &[u8] = b"Content-Type: application/json; charset=utf-8\n\n";
 
 impl StorageClient {
+    fn get_host() -> String {
+        let host = std::env::var("STORAGE_EMULATOR_HOST")
+            .unwrap_or("https://storage.googleapis.com".to_owned());
+        host.strip_suffix("/").unwrap_or(&host).to_owned()
+    }
+
     pub async fn new(token_generator: Box<dyn TokenGenerator>) -> StorageResult<Self> {
         let client = Client::default();
         let token_state_holder =
             Some(TokenStateHolder::new(client.clone(), token_generator).await?);
-
+        let host = Self::get_host();
         Ok(Self {
             client,
             token_state_holder,
+            host,
         })
     }
 
     pub fn no_auth() -> Self {
         let client = Client::default();
         let token_state_holder = None;
-
+        let host = Self::get_host();
         Self {
             client,
             token_state_holder,
+            host,
         }
     }
 
@@ -125,13 +134,21 @@ impl StorageClient {
         }
     }
 
+    fn resolve_url(&self, url: &str) -> String {
+        let host = self.host.to_owned();
+        format!("{host}/{url}")
+    }
+
     pub async fn delete(&self, url: &str) -> StorageResult<()> {
-        let request = self.with_auth(self.client.client.delete(url)).await?;
+        let url = self.resolve_url(url);
+        let request = self
+            .with_auth(self.client.client.delete(url.as_str()))
+            .await?;
         let response = request
             .send()
             .await
             .map_err(super::Error::GcsHttpDeleteError)?;
-        Self::success_response(url, response).await?;
+        Self::success_response(url.as_str(), response).await?;
         Ok(())
     }
 
@@ -141,14 +158,17 @@ impl StorageClient {
         S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
         bytes::Bytes: From<S::Ok>,
     {
-        let request = self.with_auth(self.client.client.post(url)).await?;
+        let url = self.resolve_url(url);
+        let request = self
+            .with_auth(self.client.client.post(url.as_str()))
+            .await?;
         let response = request
             .body(reqwest::Body::wrap_stream(body))
             .send()
             .await
             .map_err(super::Error::GcsHttpPostError)?;
 
-        Self::success_response(url, response).await?;
+        Self::success_response(url.as_str(), response).await?;
         Ok(())
     }
 
@@ -176,6 +196,8 @@ impl StorageClient {
         S: TryStream<Ok = bytes::Bytes> + Send + Sync + 'static,
         S::Error: Into<Box<dyn std::error::Error + Send + Sync>> + Send + Sync,
     {
+        let url = self.resolve_url(url);
+
         let json = serde_json::ser::to_vec(metadata).map_err(Error::gcs_invalid_metadata::<M>)?;
 
         let part_len = 2 * MT_SEPARATOR.len()
@@ -204,7 +226,7 @@ impl StorageClient {
         };
 
         // let total_len = part_len as u64 + size + MT_END_SEPARATOR.len() as u64;
-        let request = self.client.client.post(url);
+        let request = self.client.client.post(url.as_str());
         let request = self.with_auth(request).await?;
         let response = request
             .header("Content-Type", "multipart/related; boundary=gcs-storage")
@@ -214,7 +236,7 @@ impl StorageClient {
             .await
             .map_err(super::Error::GcsHttpPostMultipartError)?;
 
-        Self::success_response(url, response).await?;
+        Self::success_response(url.as_str(), response).await?;
         Ok(())
     }
 
@@ -226,14 +248,16 @@ impl StorageClient {
     where
         Q: Serialize,
     {
-        let request = self.with_auth(self.client.client.get(url)).await?;
+        let url = self.resolve_url(url);
+
+        let request = self.with_auth(self.client.client.get(url.as_str())).await?;
         let response = request
             .query(query)
             .send()
             .await
             .map_err(super::Error::GcsHttpGetAsStreamError)?;
 
-        Ok(Self::success_response(url, response)
+        Ok(Self::success_response(url.as_str(), response)
             .await?
             .bytes_stream()
             .map_err(super::Error::GcsHttpBytesStreamError))
@@ -244,19 +268,22 @@ impl StorageClient {
         R: DeserializeOwned,
         Q: serde::Serialize,
     {
+        let url = self.resolve_url(url);
+
         let request = self
-            .with_auth(self.client.client.get(url).query(query))
+            .with_auth(self.client.client.get(url.as_str()).query(query))
             .await?;
         let response = request
             .send()
             .await
             .map_err(super::Error::GcsHttpJsonRequestError)?;
-        let r: super::super::DeserializedResponse<R> = Self::success_response(url, response)
-            .await?
-            .json()
-            .await
-            .map_err(super::Error::GcsHttpJsonResponseError)?;
+        let r: super::super::DeserializedResponse<R> =
+            Self::success_response(url.as_str(), response)
+                .await?
+                .json()
+                .await
+                .map_err(super::Error::GcsHttpJsonResponseError)?;
         r.into_result()
-            .map_err(|err| super::Error::gcs_unexpected_json::<R>(url, err))
+            .map_err(|err| super::Error::gcs_unexpected_json::<R>(url.as_str(), err))
     }
 }

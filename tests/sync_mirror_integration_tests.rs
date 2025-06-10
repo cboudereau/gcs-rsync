@@ -245,11 +245,11 @@ async fn test_fs_to_gcs_sync_and_mirror_base(set_fs_mtime: bool) {
     let fs_source = Source::fs(src_t.base_path().as_path());
     let fs_source_replica = Source::fs(src_t.base_path().as_path());
 
-    let fs_replica_t = FsTestConfig::new();
-    let fs_dest_replica = Source::fs(fs_replica_t.base_path().as_path());
+    let fs_dest_replica_t = FsTestConfig::new();
+    let fs_dest_replica = Source::fs(fs_dest_replica_t.base_path().as_path());
 
-    let fs_replica_t2 = FsTestConfig::new();
-    let fs_dest_replica2 = Source::fs(fs_replica_t2.base_path().as_path());
+    let fs_dest_replica_t2 = FsTestConfig::new();
+    let fs_dest_replica2 = Source::fs(fs_dest_replica_t2.base_path().as_path());
 
     let rsync_fs_to_gcs = RSync::new(fs_source, gcs_dest).with_restore_fs_mtime(set_fs_mtime);
     let rsync_gcs_to_gcs_replica =
