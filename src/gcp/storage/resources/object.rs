@@ -87,8 +87,9 @@ impl FromStr for Object {
 
 type GsUrl = String;
 
-const BASE_URL: &str = "https://storage.googleapis.com/storage/v1";
-const UPLOAD_BASE_URL: &str = "https://storage.googleapis.com/upload/storage/v1";
+// https://storage.googleapis.com/
+const BASE_URL: &str = "storage/v1";
+const UPLOAD_BASE_URL: &str = "upload/storage/v1";
 
 fn percent_encode(input: &str) -> String {
     percent_encoding::utf8_percent_encode(input, percent_encoding::NON_ALPHANUMERIC).to_string()
@@ -299,7 +300,7 @@ mod tests {
     fn test_object_url() {
         let o = Object::new("hello/hello", "world/world").unwrap();
         assert_eq!(
-            "https://storage.googleapis.com/storage/v1/b/hello%2Fhello/o/world%2Fworld",
+            "storage/v1/b/hello%2Fhello/o/world%2Fworld",
             o.url()
         );
     }
@@ -308,7 +309,7 @@ mod tests {
     fn test_object_upload_url() {
         let o = Object::new("hello/hello", "world/world").unwrap();
         assert_eq!(
-            "https://storage.googleapis.com/upload/storage/v1/b/hello%2Fhello/o?uploadType=media&name=world%2Fworld",
+            "upload/storage/v1/b/hello%2Fhello/o?uploadType=media&name=world%2Fworld",
             o.upload_url("media")
         );
     }
@@ -317,7 +318,7 @@ mod tests {
     fn test_bucket_url() {
         let b = Bucket::new("hello/hello");
         assert_eq!(
-            "https://storage.googleapis.com/storage/v1/b/hello%2Fhello/o",
+            "storage/v1/b/hello%2Fhello/o",
             b.url()
         );
     }
