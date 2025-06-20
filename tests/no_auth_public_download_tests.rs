@@ -11,14 +11,15 @@ async fn test_public_bucket_mirror_when_fs_source_does_not_exist() {
     let dest = gcs_rsync::sync::ReaderWriter::fs(&fs_test_config.base_path());
 
     let rsync = gcs_rsync::sync::RSync::new(source, dest);
-    let r = rsync.mirror().await;
-
-    let r2 = r.unwrap();
 
     let mut oks = Vec::new();
-
     let mut fs_io_errors = Vec::new();
-    r2.try_buffer_unordered(config::default::CONCURRENCY_LEVEL)
+
+    rsync
+        .mirror()
+        .await
+        .unwrap()
+        .try_buffer_unordered(config::default::CONCURRENCY_LEVEL)
         .for_each(|r| {
             match r {
                 Ok(x) => oks.push(x),
