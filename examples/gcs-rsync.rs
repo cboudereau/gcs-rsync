@@ -152,7 +152,7 @@ async fn main() -> RSyncResult<()> {
         println!("mirroring {} > {}", &opt.source, &opt.dest);
         rsync
             .mirror()
-            .await
+            .await?
             .try_buffer_unordered(num_cpus)
             .for_each(|x| {
                 println!("{:?}", x);

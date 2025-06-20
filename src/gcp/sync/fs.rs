@@ -44,6 +44,22 @@ pub(super) struct FsClient {
 type Size = u64;
 
 impl FsClient {
+    pub(super) async fn is_valid(&self) -> RSyncResult<()> {
+        let path = self.prefix.base_path.as_path();
+        let path_exists = tokio::fs::try_exists(path).await.map_err(|err| {
+            RSyncError::fs_io_error("error while checking file system path", path, err)
+        })?;
+
+        if path_exists {
+            Ok(())
+        } else {
+            Err(RSyncError::InvalidRsyncSource(format!(
+                "path {:?} does not exist",
+                path
+            )))
+        }
+    }
+
     pub(super) fn new(base_path: &Path) -> Self {
         let prefix = FsPrefix::new(base_path);
         Self { prefix }

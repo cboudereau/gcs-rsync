@@ -94,6 +94,13 @@ impl GcsClient {
         }
     }
 
+    pub(super) async fn is_valid(&self) -> RSyncResult<()> {
+        self.client
+            .is_valid(&self.object_prefix.bucket, &self.object_prefix.prefix)
+            .await
+            .map_err(RSyncError::StorageError)
+    }
+
     pub(super) async fn list(&self) -> impl Stream<Item = RSyncResult<RelativePath>> + '_ {
         self.client
             .list(

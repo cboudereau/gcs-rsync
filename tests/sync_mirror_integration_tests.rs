@@ -68,6 +68,7 @@ async fn mirror(fs_client: &RSync) -> Vec<RMirrorStatus> {
     let mut actual = fs_client
         .mirror()
         .await
+        .unwrap()
         .try_buffer_unordered(config::default::CONCURRENCY_LEVEL)
         .try_collect::<Vec<_>>()
         .await
@@ -570,4 +571,35 @@ async fn test_mirror_include_and_exclude_rsync_conf() {
         ],
         actual
     );
+}
+
+#[tokio::test]
+async fn test_mirror_when_gcs_dest_doest_not_exist() {
+    let fs_test_config = FsTestConfig::new();
+    let test_file_name = "test.txt";
+    let test_file_content = "hello";
+    let test_file_path = fs_test_config.file_path(test_file_name);
+
+    write_to_file(&test_file_path, test_file_content).await;
+
+    let source = gcs_rsync::sync::ReaderWriter::gcs_no_auth("this-bucket-does-not-exist", "hello");
+    let dest = gcs_rsync::sync::ReaderWriter::fs(&fs_test_config.base_path());
+
+    let rsync = gcs_rsync::sync::RSync::new(source, dest);
+    assert!(rsync.mirror().await.is_err());
+    assert_eq!(
+        test_file_content,
+        fs_test_config.read_to_string(test_file_name).await
+    );
+}
+
+#[tokio::test]
+async fn test_mirror_when_fs_dest_doest_not_exist() {
+    let fs_test_config = FsTestConfig::new();
+
+    let source = gcs_rsync::sync::ReaderWriter::fs(&fs_test_config.base_path());
+    let dest = gcs_rsync::sync::ReaderWriter::gcs_no_auth("this-bucket-does-not-exist", "hello");
+
+    let rsync = gcs_rsync::sync::RSync::new(source, dest);
+    assert!(rsync.mirror().await.is_err());
 }
