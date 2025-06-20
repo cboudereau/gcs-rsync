@@ -44,6 +44,6 @@ impl FsTestConfig {
 impl Drop for FsTestConfig {
     fn drop(&mut self) {
         let path = self.base_path.as_path();
-        std::fs::remove_dir_all(path).unwrap();
+        std::fs::remove_dir_all(path).unwrap_or(());
     }
 }

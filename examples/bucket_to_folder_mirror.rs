@@ -29,7 +29,7 @@ async fn main() -> RSyncResult<()> {
 
     rsync
         .mirror()
-        .await
+        .await?
         .try_buffer_unordered(12)
         .try_filter(|x| match *x {
             RMirrorStatus::NotDeleted(_) => futures::future::ready(false),

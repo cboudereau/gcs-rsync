@@ -54,6 +54,13 @@ enum ReaderWriterInternal {
 type Size = u64;
 
 impl ReaderWriterInternal {
+    async fn is_valid(&self) -> RSyncResult<()> {
+        match self {
+            ReaderWriterInternal::Fs(client) => client.is_valid().await,
+            ReaderWriterInternal::Gcs(gcs_client) => gcs_client.is_valid().await,
+        }
+    }
+
     async fn list(
         &self,
     ) -> Either<
@@ -366,23 +373,30 @@ impl RSync {
     ///
     ///     let rsync = RSync::new(source, dest);
     ///
-    ///     rsync
-    ///         .mirror()
-    ///         .await
-    ///         .try_buffer_unordered(12)
-    ///         .for_each(|x| {
-    ///             println!("{:?}", x);
-    ///             futures::future::ready(())
-    ///         })
-    ///         .await;
-    ///
+    ///     match rsync.mirror().await {
+    ///         Ok(mirror_result) => {
+    ///             mirror_result
+    ///                 .try_buffer_unordered(12)
+    ///                 .for_each(|x| {
+    ///                     println!("{:?}", x);
+    ///                     futures::future::ready(())
+    ///                 })
+    ///                 .await;
+    ///         }
+    ///         Err(e) => {
+    ///             println!("cannot mirror due to error {:?}", e);
+    ///         },
+    ///     };
     ///     Ok(())
     /// }
     /// ```
     pub async fn mirror(
         &self,
-    ) -> impl Stream<Item = RSyncResult<impl Future<Output = RSyncResult<RMirrorStatus>> + '_>> + '_
-    {
+    ) -> RSyncResult<
+        impl Stream<Item = RSyncResult<impl Future<Output = RSyncResult<RMirrorStatus>> + '_>> + '_,
+    > {
+        self.source.is_valid().await?;
+
         let synced = self
             .sync()
             .await
@@ -394,7 +408,7 @@ impl RSync {
             .await
             .map_ok(futures::future::Either::Right);
 
-        synced.chain(deleted)
+        Ok(synced.chain(deleted))
     }
 }
 
@@ -445,6 +459,7 @@ pub enum RSyncError {
     },
     EmptyRelativePathError,
     GlobError(String),
+    InvalidRsyncSource(String),
 }
 
 impl RSyncError {

@@ -150,7 +150,7 @@ impl Bucket {
     }
 
     pub fn url(&self) -> String {
-        format!("{}/b/{}/o", BASE_URL, percent_encode(&self.name))
+        format!("{}/b/{}", BASE_URL, percent_encode(&self.name))
     }
 }
 
@@ -314,7 +314,7 @@ mod tests {
     #[test]
     fn test_bucket_url() {
         let b = Bucket::new("hello/hello");
-        assert_eq!("storage/v1/b/hello%2Fhello/o", b.url());
+        assert_eq!("storage/v1/b/hello%2Fhello", b.url());
     }
 
     #[test]

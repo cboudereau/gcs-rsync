@@ -74,13 +74,34 @@ impl ObjectClient {
         super::StorageResult::Ok(())
     }
 
+    fn list_url(bucket: &str) -> String {
+        format!("{}/o", Bucket::new(bucket).url())
+    }
+
+    pub async fn is_valid(&self, bucket: &str, prefix: &str) -> StorageResult<()> {
+        // For public bucket, the json api for bucket does not work to check if a bucket exists (surely for security reason).
+        // Only listing operation works. Listing the first page is quick.
+        let objects_list_request = ObjectsListRequest {
+            prefix: Some(prefix.to_owned()),
+            fields: Some("items(name)".to_owned()),
+            max_results: Some(1),
+            ..Default::default()
+        };
+
+        let url = Self::list_url(bucket);
+        self.storage_client
+            .get_as_json(&url, &objects_list_request)
+            .await
+            .map(|_: Objects| ())
+    }
+
     pub async fn list(
         &self,
         bucket: &str,
         objects_list_request: &ObjectsListRequest,
     ) -> impl Stream<Item = StorageResult<PartialObject>> + '_ {
         let objects_list_request = objects_list_request.to_owned();
-        let url = Bucket::new(bucket).url();
+        let url = Self::list_url(bucket);
         futures::stream::try_unfold(
             (Some(objects_list_request), url),
             move |(state, url)| async move {
