@@ -49,6 +49,7 @@ impl FsClient {
         let path_exists = tokio::fs::try_exists(path).await.map_err(|err| {
             RSyncError::fs_io_error("error while checking file system path", path, err)
         })?;
+
         if path_exists {
             Ok(())
         } else {
