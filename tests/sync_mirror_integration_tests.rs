@@ -592,3 +592,14 @@ async fn test_mirror_when_gcs_dest_doest_not_exist() {
         fs_test_config.read_to_string(test_file_name).await
     );
 }
+
+#[tokio::test]
+async fn test_mirror_when_fs_dest_doest_not_exist() {
+    let fs_test_config = FsTestConfig::new();
+
+    let source = gcs_rsync::sync::ReaderWriter::fs(&fs_test_config.base_path());
+    let dest = gcs_rsync::sync::ReaderWriter::gcs_no_auth("this-bucket-does-not-exist", "hello");
+
+    let rsync = gcs_rsync::sync::RSync::new(source, dest);
+    assert!(rsync.mirror().await.is_err());
+}
